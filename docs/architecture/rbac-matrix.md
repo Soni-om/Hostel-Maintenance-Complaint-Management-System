@@ -34,3 +34,4 @@
 | **Categories: Manage** | `POST/PUT/DELETE /api/v1/categories` | ❌ | ❌ | ✅ | Admin only. |
 | **Users: List & Manage** | `/api/v1/users/*` | ❌ | ❌ | ✅ | Admin only. |
 | **Stats: Dashboard** | `GET /api/v1/stats/dashboard` | ✅ | ✅ | ✅ | Scoped dynamically per role context. |
+

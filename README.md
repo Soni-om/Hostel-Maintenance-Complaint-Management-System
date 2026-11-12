@@ -186,3 +186,4 @@ Hostal_Anti/
 
 - **Status**: Completed & Verified
 - **Verification**: Backend starts cleanly, health probe returns `200 OK`, frontend static assets serve without errors, and Git repository initialized with clean commits.
+

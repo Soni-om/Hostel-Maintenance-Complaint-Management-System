@@ -41,9 +41,14 @@ app.use((req, res, next) => {
 const frontendPath = path.join(__dirname, '..', '..', 'frontend');
 app.use(express.static(frontendPath));
 
-// Serve secure public uploads (complaint images)
-const uploadsPath = path.join(__dirname, '..', 'uploads');
-app.use('/uploads', express.static(uploadsPath));
+// Uploads Access Guard: Complaint photographs are strictly private and protected
+// Direct public static exposure is prohibited to prevent unauthorized access to resident photos
+app.use('/uploads', (req, res) => {
+  return res.status(403).json({
+    success: false,
+    message: 'Access Denied: Direct public access to complaint attachments is forbidden. Authentication and authorization required.'
+  });
+});
 
 // ==========================================
 // 3. API Base & Health Check Route
@@ -112,3 +117,4 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = app;
+

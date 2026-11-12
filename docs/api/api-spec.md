@@ -173,3 +173,4 @@ Base URL: `http://localhost:5000/api/v1`
 - **Endpoint:** `/stats/dashboard`
 - **Access:** Authenticated (Data dynamically scoped to Student/Staff/Admin context)
 - **Success:** `200 OK` $\rightarrow$ `{ success: true, stats: { total, pending, in_progress, resolved, closed, avg_resolution_hours } }`
+

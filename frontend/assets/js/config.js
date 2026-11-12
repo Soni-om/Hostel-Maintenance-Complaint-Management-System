@@ -15,3 +15,4 @@ const CONFIG = {
 
 // Freeze to prevent runtime modifications
 Object.freeze(CONFIG);
+

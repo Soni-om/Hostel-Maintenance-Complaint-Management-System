@@ -55,3 +55,4 @@
 - **Student Dashboard**: Quick ticket creation, active vs. resolved ticket counts, recent status tracking.
 - **Staff Dashboard**: Assigned queues, severity badges, quick status transition action modals, search & filter.
 - **Admin Dashboard**: System-wide KPI cards (Total, Pending, In Progress, Resolved, Overdue), category distribution charts, and exportable operational summaries.
+
