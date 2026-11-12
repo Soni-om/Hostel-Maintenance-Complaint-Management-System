@@ -232,7 +232,7 @@
         <p style="margin: 0; font-size: var(--font-xs);">College Full Stack Project-Based Learning System</p>
       </div>
       <div>
-        <span class="badge" style="background: var(--color-primary-light); color: var(--color-primary);">Session 1 Ready</span>
+        <span class="badge" style="background: var(--color-primary-light); color: var(--color-primary);">Session 3 Active</span>
       </div>
     </div>
   </footer>
@@ -251,7 +251,10 @@
         if (response.ok) {
           const data = await response.json();
           indicator.classList.add('online');
-          label.textContent = `API Online (v${data.version})`;
+          const dbConnected = data.database && data.database.status === 'connected';
+          label.textContent = dbConnected 
+            ? `API & DB Online (${data.database.latencyMs}ms)` 
+            : `API Online (DB Disconnected)`;
         } else {
           indicator.classList.remove('online');
           label.textContent = 'API Degraded';
