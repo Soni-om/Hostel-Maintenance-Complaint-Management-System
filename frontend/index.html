@@ -241,23 +241,28 @@
   <script src="/assets/js/api.js"></script>
   <script src="/assets/js/utils.js"></script>
   <script>
-    // Live probe to verify backend API health
+    // Live probe to verify backend API and database health
     async function checkBackendHealth() {
       const indicator = document.getElementById('status-indicator');
       const label = document.getElementById('status-label');
       
       try {
         const response = await fetch('/api/health');
-        if (response.ok) {
-          const data = await response.json();
+        const data = await response.json().catch(() => ({}));
+        const dbConnected = data.database && data.database.status === 'connected';
+
+        if (response.ok && dbConnected) {
           indicator.classList.add('online');
-          const dbConnected = data.database && data.database.status === 'connected';
-          label.textContent = dbConnected 
-            ? `API & DB Online (${data.database.latencyMs}ms)` 
-            : `API Online (DB Disconnected)`;
+          label.textContent = `API & DB Online (${data.database.latencyMs}ms)`;
+        } else if (response.ok && !dbConnected) {
+          indicator.classList.remove('online');
+          label.textContent = 'Database Disconnected';
+        } else if (response.status === 503) {
+          indicator.classList.remove('online');
+          label.textContent = 'Service Degraded (DB Offline)';
         } else {
           indicator.classList.remove('online');
-          label.textContent = 'API Degraded';
+          label.textContent = 'API Error';
         }
       } catch (err) {
         indicator.classList.remove('online');

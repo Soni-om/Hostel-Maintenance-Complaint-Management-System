@@ -20,7 +20,7 @@ const app = express();
 
 // Cross-Origin Resource Sharing
 const corsOptions = {
-  origin: process.env.CLIENT_URL || '*',
+  origin: process.env.FRONTEND_ORIGIN || process.env.CLIENT_URL || '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -77,8 +77,8 @@ async function handleHealthCheck(req, res) {
     database: {
       status: isHealthy ? 'connected' : 'disconnected',
       latencyMs: dbHealth.latencyMs,
-      database: dbHealth.database || process.env.DB_NAME || 'hostelcare_db',
-      ...(dbHealth.error && { error: dbHealth.error })
+      database: isHealthy ? (dbHealth.database || 'hostelcare_db') : undefined,
+      ...(!isHealthy && { message: 'Database service is temporarily unavailable' })
     }
   });
 }
@@ -95,10 +95,8 @@ async function handleDbHealthCheck(req, res) {
     database: {
       status: dbHealth.success ? 'connected' : 'disconnected',
       latencyMs: dbHealth.latencyMs,
-      targetDatabase: dbHealth.database || process.env.DB_NAME || 'hostelcare_db',
-      host: dbHealth.host || process.env.DB_HOST || 'localhost',
-      port: dbHealth.port || parseInt(process.env.DB_PORT, 10) || 3306,
-      ...(dbHealth.error && { error: dbHealth.error, code: dbHealth.code })
+      targetDatabase: dbHealth.success ? (dbHealth.database || 'hostelcare_db') : undefined,
+      ...(!dbHealth.success && { message: 'Database service is temporarily unreachable' })
     },
     timestamp: new Date().toISOString()
   });
@@ -109,6 +107,15 @@ app.get('/api/health', handleHealthCheck);
 app.get('/api/health/db', handleDbHealthCheck);
 app.get(`${apiPrefix}/health`, handleHealthCheck);
 app.get(`${apiPrefix}/health/db`, handleDbHealthCheck);
+
+// Middleware Echo Diagnostic Endpoint (Verifies express.json and express.urlencoded)
+app.post('/api/test-echo', (req, res) => {
+  return res.status(200).json({
+    success: true,
+    contentType: req.headers['content-type'],
+    body: req.body
+  });
+});
 
 // Root route handler: serve landing page
 app.get('/', (req, res) => {
@@ -129,6 +136,14 @@ app.use('/api/*', (req, res) => {
 // 5. Centralized Error Handling Middleware
 // ==========================================
 app.use((err, req, res, next) => {
+  // Handle invalid/malformed JSON syntax from express.json()
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid JSON payload received. Request body syntax is malformed.'
+    });
+  }
+
   console.error('Unhandled Server Error:', err);
   const statusCode = err.status || err.statusCode || 500;
 

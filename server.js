@@ -75,4 +75,11 @@ async function handleShutdown(signal) {
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 process.on('SIGINT', () => handleShutdown('SIGINT'));
 
+// IPC message handler for process orchestrators and test harnesses (cross-platform Windows/POSIX support)
+process.on('message', (msg) => {
+  if (msg === 'shutdown' || msg === 'SIGINT' || msg === 'SIGTERM') {
+    handleShutdown(msg);
+  }
+});
+
 startServer();
