@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Governance — HostelCare</title>
+  <link rel="stylesheet" href="/assets/css/variables.css">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/components.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="navbar">
+    <div class="container navbar-content">
+      <a href="/" class="brand">
+        <span class="brand-icon">H</span>
+        <span>HostelCare <span style="font-size: var(--font-xs); font-weight: 500; color: var(--color-text-muted);">| Administration Console</span></span>
+      </a>
+      <div class="flex items-center gap-4">
+        <a href="/" class="btn btn-secondary btn-sm">Home</a>
+        <a href="/pages/auth/login.html" class="btn btn-primary btn-sm">Log Out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top: 2.5rem; padding-bottom: 3rem;">
+    <!-- Welcome Header -->
+    <div class="flex justify-between items-center" style="margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <h1>System Administration & Governance</h1>
+        <p class="text-muted">Hostel-wide analytics, user role administration, and complaint category configuration.</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-secondary btn-sm" onclick="alert('Category management scheduled for Session 14.')">Categories</button>
+        <button class="btn btn-primary btn-sm" onclick="alert('User provisioning scheduled for Session 13.')">Manage Users</button>
+      </div>
+    </div>
+
+    <!-- Quick Metric Cards -->
+    <div class="grid grid-cols-4" style="margin-bottom: 2.5rem;">
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Total System Tickets</div>
+          <div class="stat-value">0</div>
+        </div>
+        <div style="font-size: 2rem;">📊</div>
+      </div>
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Registered Students</div>
+          <div class="stat-value">0</div>
+        </div>
+        <div style="font-size: 2rem;">🎓</div>
+      </div>
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Active Staff</div>
+          <div class="stat-value">0</div>
+        </div>
+        <div style="font-size: 2rem;">👷</div>
+      </div>
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Avg. Resolution (Hours)</div>
+          <div class="stat-value">0.0</div>
+        </div>
+        <div style="font-size: 2rem;">⏱️</div>
+      </div>
+    </div>
+
+    <!-- Admin Overview Panel -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Hostel System Overview</h3>
+        <span class="badge badge-closed">Admin Privileges</span>
+      </div>
+      <div style="text-align: center; padding: 3rem 1rem;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">🏢</div>
+        <h3>System Governance Center Ready</h3>
+        <p class="text-muted text-sm" style="max-width: 440px; margin: 0 auto;">
+          The Admin console provides centralized control over staff accounts, category master definitions, and SLA performance dashboards (Phase 4, Sessions 13-15).
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <script src="/assets/js/config.js"></script>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/utils.js"></script>
+</body>
+</html>

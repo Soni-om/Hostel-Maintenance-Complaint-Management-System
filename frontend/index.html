@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HostelCare — Hostel Maintenance & Complaint Management System</title>
+  <link rel="stylesheet" href="/assets/css/variables.css">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/components.css">
+  <style>
+    .hero-section {
+      padding: 5rem 0 4rem;
+      background: linear-gradient(180deg, var(--color-primary-light) 0%, var(--color-bg-body) 100%);
+      border-bottom: 1px solid var(--color-border);
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.85rem;
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-primary-subtle);
+      border-radius: var(--radius-full);
+      font-size: var(--font-xs);
+      font-weight: 600;
+      color: var(--color-primary);
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow-xs);
+    }
+    .hero-title {
+      font-size: 3rem;
+      font-weight: 800;
+      color: var(--color-text-main);
+      max-width: 820px;
+      margin: 0 auto 1.25rem;
+      letter-spacing: -0.025em;
+    }
+    .hero-lead {
+      font-size: var(--font-lg);
+      color: var(--color-text-muted);
+      max-width: 650px;
+      margin: 0 auto 2rem;
+    }
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .role-card {
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+    }
+    .role-card:hover {
+      transform: translateY(-4px);
+    }
+    .role-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-sm);
+      display: inline-block;
+      margin-bottom: 1rem;
+    }
+    .health-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--font-xs);
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-muted);
+      border: 1px solid var(--color-border);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--color-text-light);
+    }
+    .status-dot.online {
+      background-color: var(--color-success);
+      box-shadow: 0 0 8px rgba(22, 163, 74, 0.6);
+    }
+    .footer {
+      margin-top: auto;
+      background-color: var(--color-bg-surface);
+      border-top: 1px solid var(--color-border);
+      padding: 2.5rem 0;
+      font-size: var(--font-sm);
+      color: var(--color-text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="container navbar-content">
+      <a href="/" class="brand">
+        <span class="brand-icon">H</span>
+        <span>HostelCare</span>
+      </a>
+
+      <div class="flex items-center gap-4">
+        <div id="backend-status" class="health-pill">
+          <span class="status-dot" id="status-indicator"></span>
+          <span id="status-label">Checking API...</span>
+        </div>
+        <nav class="flex items-center gap-3">
+          <a href="/pages/auth/login.html" class="btn btn-secondary btn-sm">Sign In</a>
+          <a href="/pages/auth/register.html" class="btn btn-primary btn-sm">Student Registration</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="container">
+      <div class="hero-badge">
+        <span>🚀 Full-Stack PBL Platform</span>
+        <span>•</span>
+        <span>Enterprise Architecture</span>
+      </div>
+      <h1 class="hero-title">Hostel Maintenance & Complaint Resolution Simplified</h1>
+      <p class="hero-lead">
+        A structured, role-based platform designed for modern campus residences. Report electrical, plumbing, water, and room maintenance issues with digital ticket tracking.
+      </p>
+      <div class="hero-actions">
+        <a href="/pages/student/dashboard.html" class="btn btn-primary">Student Portal</a>
+        <a href="/pages/staff/dashboard.html" class="btn btn-secondary">Staff Maintenance Desk</a>
+        <a href="/pages/admin/dashboard.html" class="btn btn-secondary">Admin Governance</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Portal Navigation Grid -->
+  <main class="container" style="padding-top: 4rem; padding-bottom: 4rem;">
+    <div style="margin-bottom: 2rem;">
+      <h2>Role-Based Portals</h2>
+      <p class="text-muted">Choose your designated stakeholder workspace to access role-specific workflows.</p>
+    </div>
+
+    <div class="grid grid-cols-3">
+      <!-- Student Portal -->
+      <div class="card role-card">
+        <div>
+          <span class="role-badge" style="background: #dbeafe; color: #1e40af;">Student</span>
+          <h3 style="margin-bottom: 0.5rem;">Student Resident</h3>
+          <p class="text-muted text-sm">
+            File maintenance requests, attach photo evidence, track real-time resolution status, and submit post-completion ratings.
+          </p>
+        </div>
+        <div style="margin-top: 1.5rem;">
+          <a href="/pages/student/dashboard.html" class="btn btn-primary btn-block">Enter Student Portal →</a>
+        </div>
+      </div>
+
+      <!-- Staff Maintenance Desk -->
+      <div class="card role-card">
+        <div>
+          <span class="role-badge" style="background: #fef3c7; color: #92400e;">Staff</span>
+          <h3 style="margin-bottom: 0.5rem;">Staff & Technicians</h3>
+          <p class="text-muted text-sm">
+            Review assigned complaints, update progress lifecycle (Pending → Assigned → In Progress → Resolved), and provide official resolution remarks.
+          </p>
+        </div>
+        <div style="margin-top: 1.5rem;">
+          <a href="/pages/staff/dashboard.html" class="btn btn-secondary btn-block">Open Staff Desk →</a>
+        </div>
+      </div>
+
+      <!-- Admin Governance -->
+      <div class="card role-card">
+        <div>
+          <span class="role-badge" style="background: #f1f5f9; color: #334155;">Administration</span>
+          <h3 style="margin-bottom: 0.5rem;">Hostel Administration</h3>
+          <p class="text-muted text-sm">
+            System-wide oversight, manage complaint categories, provision staff accounts, analyze resolution turnaround, and inspect SLA metrics.
+          </p>
+        </div>
+        <div style="margin-top: 1.5rem;">
+          <a href="/pages/admin/dashboard.html" class="btn btn-secondary btn-block">Admin Console →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Core Features Section -->
+    <div style="margin-top: 4rem;">
+      <h2 style="margin-bottom: 0.5rem;">Enterprise PBL Architectural Pillars</h2>
+      <p class="text-muted" style="margin-bottom: 2rem;">Built strictly conforming to the specified 5-phase PBL curriculum.</p>
+
+      <div class="grid grid-cols-4">
+        <div class="card">
+          <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">🎫</div>
+          <h4 style="margin-bottom: 0.5rem;">Unique Ticket System</h4>
+          <p class="text-sm text-muted">Automated ticket sequence generator (HC-YYYYMMDD-XXXX) ensures strict audit traceability.</p>
+        </div>
+
+        <div class="card">
+          <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">🔒</div>
+          <h4 style="margin-bottom: 0.5rem;">JWT & RBAC Security</h4>
+          <p class="text-sm text-muted">Stateless authorization with bcrypt password hashing and backend permission enforcement.</p>
+        </div>
+
+        <div class="card">
+          <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">📸</div>
+          <h4 style="margin-bottom: 0.5rem;">Secure Multer Storage</h4>
+          <p class="text-sm text-muted">Photo verification uploads restricted by MIME-type, sanitized filenames, and 5MB caps.</p>
+        </div>
+
+        <div class="card">
+          <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">⚡</div>
+          <h4 style="margin-bottom: 0.5rem;">Relational MySQL</h4>
+          <p class="text-sm text-muted">7-table relational schema using mysql2/promise, foreign keys, transactions, and status history.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container flex justify-between items-center" style="flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <p style="margin: 0; font-weight: 600; color: var(--color-text-main);">HostelCare — Full-Stack PBL Project</p>
+        <p style="margin: 0; font-size: var(--font-xs);">College Full Stack Project-Based Learning System</p>
+      </div>
+      <div>
+        <span class="badge" style="background: var(--color-primary-light); color: var(--color-primary);">Session 1 Ready</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/assets/js/config.js"></script>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script>
+    // Live probe to verify backend API health
+    async function checkBackendHealth() {
+      const indicator = document.getElementById('status-indicator');
+      const label = document.getElementById('status-label');
+      
+      try {
+        const response = await fetch('/api/health');
+        if (response.ok) {
+          const data = await response.json();
+          indicator.classList.add('online');
+          label.textContent = `API Online (v${data.version})`;
+        } else {
+          indicator.classList.remove('online');
+          label.textContent = 'API Degraded';
+        }
+      } catch (err) {
+        indicator.classList.remove('online');
+        label.textContent = 'Backend Offline';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', checkBackendHealth);
+  </script>
+</body>
+</html>

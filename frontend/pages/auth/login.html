@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — HostelCare</title>
+  <link rel="stylesheet" href="/assets/css/variables.css">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/components.css">
+</head>
+<body style="justify-content: center; align-items: center; min-height: 100vh; padding: 2rem 1rem;">
+
+  <div class="card" style="width: 100%; max-width: 440px;">
+    <div class="text-center" style="margin-bottom: 2rem;">
+      <a href="/" class="brand" style="justify-content: center; margin-bottom: 0.75rem;">
+        <span class="brand-icon">H</span>
+        <span>HostelCare</span>
+      </a>
+      <h2>Welcome Back</h2>
+      <p class="text-muted text-sm">Sign in to access your role-based maintenance portal</p>
+    </div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label class="form-label" for="email">Institutional Email</label>
+        <input type="email" id="email" class="form-input" placeholder="e.g. rollnumber@hostel.edu" required autofocus>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input type="password" id="password" class="form-input" placeholder="••••••••" required>
+      </div>
+
+      <div style="margin-top: 1.5rem;">
+        <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+      </div>
+    </form>
+
+    <div class="text-center" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border);">
+      <p class="text-sm text-muted" style="margin-bottom: 0.5rem;">
+        New student resident? <a href="/pages/auth/register.html">Register Account</a>
+      </p>
+      <p class="text-xs text-muted" style="margin: 0;">
+        <a href="/">← Return to Main Portal</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="/assets/js/config.js"></script>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/utils.js"></script>
+  <script>
+    document.getElementById('login-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      Utils.showToast('Authentication module will be connected in Session 4.', 'info');
+    });
+  </script>
+</body>
+</html>
