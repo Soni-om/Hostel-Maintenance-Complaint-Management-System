@@ -1,18 +1,26 @@
 /**
  * HostelCare — Frontend Global Configuration
+ * Central configuration for API endpoints, storage keys, and environment detection
  */
 
 const CONFIG = {
   APP_NAME: 'HostelCare',
   APP_VERSION: '1.0.0',
-  API_BASE_URL: window.location.origin.includes('5000') 
-    ? `${window.location.origin}/api/v1` 
+  API_BASE_URL: (typeof window !== 'undefined' && window.location.origin.includes('5000'))
+    ? `${window.location.origin}/api/v1`
     : 'http://localhost:5000/api/v1',
-  TOKEN_STORAGE_KEY: 'hostelcare_auth_token',
-  USER_STORAGE_KEY: 'hostelcare_auth_user',
-  DEFAULT_AVATAR: 'https://ui-avatars.com/api/?background=1e40af&color=fff&name='
+  HEALTH_URL: (typeof window !== 'undefined' && window.location.origin.includes('5000'))
+    ? `${window.location.origin}/api/health`
+    : 'http://localhost:5000/api/health',
+  DB_HEALTH_URL: (typeof window !== 'undefined' && window.location.origin.includes('5000'))
+    ? `${window.location.origin}/api/health/db`
+    : 'http://localhost:5000/api/health/db',
+  TOKEN_KEY: 'hostelcare_token',
+  USER_KEY: 'hostelcare_user'
 };
 
-// Freeze to prevent runtime modifications
-Object.freeze(CONFIG);
+if (typeof window !== 'undefined') {
+  window.CONFIG = CONFIG;
+}
 
+export default CONFIG;

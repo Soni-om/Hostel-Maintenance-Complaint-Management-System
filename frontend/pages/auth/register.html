@@ -70,19 +70,45 @@
       <p class="text-sm text-muted" style="margin-bottom: 0.5rem;">
         Already registered? <a href="/pages/auth/login.html">Sign In Here</a>
       </p>
-      <p class="text-xs text-muted" style="margin: 0;">
+      <p class="text-xs text-muted" style="margin-bottom: 1rem;">
         <a href="/">← Return to Main Portal</a>
       </p>
+
+      <!-- Live Backend Status -->
+      <div id="auth-status" style="font-size: var(--font-xs); color: var(--color-text-muted); display: flex; align-items: center; justify-content: center; gap: 6px;">
+        <span id="auth-dot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-light);"></span>
+        <span id="auth-label">Checking API...</span>
+      </div>
     </div>
   </div>
 
-  <script src="/assets/js/config.js"></script>
-  <script src="/assets/js/api.js"></script>
-  <script src="/assets/js/utils.js"></script>
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/utils.js"></script>
   <script>
+    async function checkStatus() {
+      const dot = document.getElementById('auth-dot');
+      const label = document.getElementById('auth-label');
+      try {
+        const data = await window.Api.checkHealth();
+        if (data.database && data.database.status === 'connected') {
+          dot.style.background = 'var(--color-success)';
+          dot.style.boxShadow = '0 0 6px rgba(22, 163, 74, 0.6)';
+          label.textContent = `Backend & MySQL Online (${data.database.latencyMs}ms)`;
+        } else {
+          dot.style.background = 'var(--color-warning)';
+          label.textContent = 'API Online (Database Disconnected)';
+        }
+      } catch {
+        dot.style.background = 'var(--color-danger)';
+        label.textContent = 'Backend Offline';
+      }
+    }
+    document.addEventListener('DOMContentLoaded', checkStatus);
+
     document.getElementById('register-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      Utils.showToast('Registration endpoint will be integrated in Session 4.', 'info');
+      Utils.showToast('Registration API endpoint will be integrated in Session 5.', 'info');
     });
   </script>
 </body>

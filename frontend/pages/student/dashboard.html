@@ -17,6 +17,10 @@
         <span>HostelCare <span style="font-size: var(--font-xs); font-weight: 500; color: var(--color-text-muted);">| Student Workspace</span></span>
       </a>
       <div class="flex items-center gap-4">
+        <div id="student-status-badge" style="font-size: var(--font-xs); color: var(--color-text-muted); display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--color-bg-muted); border-radius: var(--radius-full); border: 1px solid var(--color-border);">
+          <span id="student-dot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-light);"></span>
+          <span id="student-status-label">Checking API...</span>
+        </div>
         <a href="/" class="btn btn-secondary btn-sm">Home</a>
         <a href="/pages/auth/login.html" class="btn btn-primary btn-sm">Log Out</a>
       </div>
@@ -89,9 +93,30 @@
     </div>
   </main>
 
-  <script src="/assets/js/config.js"></script>
-  <script src="/assets/js/api.js"></script>
-  <script src="/assets/js/utils.js"></script>
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/utils.js"></script>
+  <script>
+    async function checkStatus() {
+      const dot = document.getElementById('student-dot');
+      const label = document.getElementById('student-status-label');
+      try {
+        const data = await window.Api.checkHealth();
+        if (data.database && data.database.status === 'connected') {
+          dot.style.background = 'var(--color-success)';
+          dot.style.boxShadow = '0 0 6px rgba(22, 163, 74, 0.6)';
+          label.textContent = `Backend & DB Online (${data.database.latencyMs}ms)`;
+        } else {
+          dot.style.background = 'var(--color-warning)';
+          label.textContent = 'API Online (DB Disconnected)';
+        }
+      } catch {
+        dot.style.background = 'var(--color-danger)';
+        label.textContent = 'Backend Offline';
+      }
+    }
+    document.addEventListener('DOMContentLoaded', checkStatus);
+  </script>
 </body>
 </html>
 
