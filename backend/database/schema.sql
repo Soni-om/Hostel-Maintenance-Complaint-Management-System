@@ -42,14 +42,19 @@ CREATE TABLE users (
   phone VARCHAR(20) NULL,
   role ENUM('student', 'staff', 'admin') NOT NULL,
   account_status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
-  hostel_block VARCHAR(50) NULL COMMENT 'Associated hostel block for student or staff supervisor',
+  block_id INT NULL COMMENT 'Foreign key to hostel_blocks.id',
+  hostel_block VARCHAR(50) NULL COMMENT 'Associated hostel block name for student or staff supervisor',
   room_number VARCHAR(20) NULL COMMENT 'Room number for student resident',
   staff_designation VARCHAR(100) NULL COMMENT 'e.g. Electrician, Plumber, Supervisor, Warden',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_user_block
+    FOREIGN KEY (block_id) REFERENCES hostel_blocks(id)
+    ON DELETE SET NULL ON UPDATE CASCADE,
   INDEX idx_users_role (role),
   INDEX idx_users_status (account_status),
-  INDEX idx_users_block_room (hostel_block, room_number)
+  INDEX idx_users_block_room (hostel_block, room_number),
+  INDEX idx_users_block_id (block_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
@@ -77,6 +82,7 @@ CREATE TABLE complaints (
   category_id INT NOT NULL COMMENT 'Foreign key to complaint_categories.id',
   title VARCHAR(150) NOT NULL,
   description TEXT NOT NULL,
+  block_id INT NULL COMMENT 'Foreign key to hostel_blocks.id',
   hostel_block VARCHAR(50) NOT NULL,
   room_number VARCHAR(20) NOT NULL,
   priority ENUM('low', 'normal', 'high', 'urgent') NOT NULL DEFAULT 'normal',
@@ -90,9 +96,13 @@ CREATE TABLE complaints (
   CONSTRAINT fk_complaint_category
     FOREIGN KEY (category_id) REFERENCES complaint_categories(id)
     ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT fk_complaint_block
+    FOREIGN KEY (block_id) REFERENCES hostel_blocks(id)
+    ON DELETE RESTRICT ON UPDATE CASCADE,
   INDEX idx_complaints_status (status),
   INDEX idx_complaints_student (student_id),
   INDEX idx_complaints_category (category_id),
+  INDEX idx_complaints_block_id (block_id),
   INDEX idx_complaints_priority (priority),
   INDEX idx_complaints_created (created_at),
   INDEX idx_complaints_block (hostel_block)

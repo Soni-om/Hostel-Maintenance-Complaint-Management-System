@@ -35,6 +35,7 @@ erDiagram
         varchar phone
         enum role "student, staff, admin"
         enum account_status "active, inactive"
+        int block_id FK
         varchar hostel_block
         varchar room_number
         varchar staff_designation
@@ -57,6 +58,7 @@ erDiagram
         int category_id FK
         varchar title
         text description
+        int block_id FK
         varchar hostel_block
         varchar room_number
         enum priority "low, normal, high, urgent"
@@ -123,9 +125,11 @@ Physical hostel blocks / residence halls on campus.
 Central user identity storage supporting role-based access control.
 - **`id`**: `INT AUTO_INCREMENT PRIMARY KEY`
 - **`email`**: `VARCHAR(150) NOT NULL UNIQUE`
+- **`block_id`**: `INT NULL` (Foreign Key referencing `hostel_blocks.id`, `ON DELETE SET NULL ON UPDATE CASCADE`)
+- **`hostel_block`**: `VARCHAR(50) NULL` (Denormalized display cache of block name)
 - **`role`**: `ENUM('student', 'staff', 'admin') NOT NULL`
 - **`account_status`**: `ENUM('active', 'inactive') NOT NULL DEFAULT 'active'`
-- **Indexes**: `idx_users_role`, `idx_users_status`, `idx_users_block_room`
+- **Indexes**: `idx_users_role`, `idx_users_status`, `idx_users_block_room`, `idx_users_block_id`
 
 ### 2.3 Table: `complaint_categories`
 Classification master defining maintenance disciplines.
@@ -141,7 +145,8 @@ Primary operational ticket entity.
 - **Foreign Keys**:
   - `fk_complaint_student`: `student_id -> users(id)` (`ON DELETE RESTRICT ON UPDATE CASCADE`)
   - `fk_complaint_category`: `category_id -> complaint_categories(id)` (`ON DELETE RESTRICT ON UPDATE CASCADE`)
-- **Indexes**: `idx_complaints_status`, `idx_complaints_student`, `idx_complaints_category`, `idx_complaints_priority`, `idx_complaints_created`
+  - `fk_complaint_block`: `block_id -> hostel_blocks(id)` (`ON DELETE RESTRICT ON UPDATE CASCADE`)
+- **Indexes**: `idx_complaints_status`, `idx_complaints_student`, `idx_complaints_category`, `idx_complaints_block_id`, `idx_complaints_priority`, `idx_complaints_created`
 
 ### 2.5 Table: `complaint_assignments`
 Tracks technician delegation and work assignment history.

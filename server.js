@@ -1,11 +1,11 @@
 /**
  * HostelCare — HTTP Server Entrypoint
- * Architecture: Environment loader, HTTP listener, and graceful process management
+ * Architecture: Environment loader, HTTP listener, and graceful process management (ES Modules)
  */
 
-require('dotenv').config();
-const http = require('http');
-const app = require('./backend/src/app');
+import 'dotenv/config';
+import http from 'node:http';
+import app from './backend/src/app.js';
 
 const PORT = parseInt(process.env.PORT, 10) || 5000;
 const HOST = '0.0.0.0';
@@ -41,4 +41,3 @@ const handleShutdown = (signal) => {
 
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 process.on('SIGINT', () => handleShutdown('SIGINT'));
-

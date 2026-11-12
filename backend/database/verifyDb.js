@@ -3,10 +3,14 @@
  * Tests MySQL Connection, Schema Execution, Foreign Key Integrity, and JOIN Queries
  */
 
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
-const mysql = require('mysql2/promise');
+import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import mysql from 'mysql2/promise';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Allow password override via CLI: node verifyDb.js [password]
 const cliPassword = process.argv[2];

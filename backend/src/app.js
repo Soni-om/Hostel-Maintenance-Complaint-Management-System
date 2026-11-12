@@ -1,11 +1,15 @@
 /**
  * HostelCare — Application Initialization & Express Middleware Stack
- * Architecture: RESTful API Layer with Static Frontend Serving
+ * Architecture: RESTful API Layer with Static Frontend Serving (ES Modules)
  */
 
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
+import express from 'express';
+import cors from 'cors';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -116,5 +120,4 @@ app.use((err, req, res, next) => {
   });
 });
 
-module.exports = app;
-
+export default app;

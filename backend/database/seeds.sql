@@ -32,20 +32,20 @@ INSERT INTO hostel_blocks (id, block_code, block_name, total_floors, total_rooms
 -- 1 Admin, 3 Staff (Supervisor, Electrician, Plumber), 4 Students
 -- BCrypt Hash: $2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO
 -- ----------------------------------------------------------------------------
-INSERT INTO users (id, name, email, password_hash, phone, role, account_status, hostel_block, room_number, staff_designation) VALUES
+INSERT INTO users (id, name, email, password_hash, phone, role, account_status, block_id, hostel_block, room_number, staff_designation) VALUES
 -- Administrator
-(1, 'Chief Warden Sharma', 'admin@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9811002233', 'admin', 'active', NULL, NULL, 'Chief Hostel Administrator'),
+(1, 'Chief Warden Sharma', 'admin@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9811002233', 'admin', 'active', NULL, NULL, NULL, 'Chief Hostel Administrator'),
 
 -- Staff Maintenance Team
-(2, 'Sunita Sharma', 'sunita.supervisor@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9822003344', 'staff', 'active', 'Block A', NULL, 'Maintenance Supervisor'),
-(3, 'Rajesh Kumar', 'rajesh.electrician@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9833004455', 'staff', 'active', 'Block A', NULL, 'Senior Electrician'),
-(4, 'Ramesh Patel', 'ramesh.plumber@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9844005566', 'staff', 'active', 'Block B', NULL, 'Plumbing Specialist'),
+(2, 'Sunita Sharma', 'sunita.supervisor@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9822003344', 'staff', 'active', 1, 'Block A', NULL, 'Maintenance Supervisor'),
+(3, 'Rajesh Kumar', 'rajesh.electrician@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9833004455', 'staff', 'active', 1, 'Block A', NULL, 'Senior Electrician'),
+(4, 'Ramesh Patel', 'ramesh.plumber@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9844005566', 'staff', 'active', 2, 'Block B', NULL, 'Plumbing Specialist'),
 
 -- Students
-(5, 'Rahul Sharma', 'rahul.cs23@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9855006677', 'student', 'active', 'Block A', 'A-102', NULL),
-(6, 'Priya Verma', 'priya.ee24@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9866007788', 'student', 'active', 'Block B', 'B-204', NULL),
-(7, 'Aman Gupta', 'aman.me23@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9877008899', 'student', 'active', 'Block A', 'A-310', NULL),
-(8, 'Sneha Rao', 'sneha.cv24@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9888009900', 'student', 'active', 'Block C', 'C-115', NULL);
+(5, 'Rahul Sharma', 'rahul.cs23@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9855006677', 'student', 'active', 1, 'Block A', 'A-102', NULL),
+(6, 'Priya Verma', 'priya.ee24@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9866007788', 'student', 'active', 2, 'Block B', 'B-204', NULL),
+(7, 'Aman Gupta', 'aman.me23@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9877008899', 'student', 'active', 1, 'Block A', 'A-310', NULL),
+(8, 'Sneha Rao', 'sneha.cv24@hostelcare.edu', '$2a$10$9i4HF7IgiPZx4Ng.SCpKIeHGIcVsW6Nf9OIE/NjnZhuskb65jdCqO', '+91 9888009900', 'student', 'active', 3, 'Block C', 'C-115', NULL);
 
 -- ----------------------------------------------------------------------------
 -- 3. SEED: complaint_categories
@@ -62,21 +62,21 @@ INSERT INTO complaint_categories (id, name, description, active) VALUES
 -- 4. SEED: complaints
 -- Cover the full status lifecycle: pending, assigned, in_progress, resolved, closed
 -- ----------------------------------------------------------------------------
-INSERT INTO complaints (id, ticket_number, student_id, category_id, title, description, hostel_block, room_number, priority, status, created_at, resolved_at) VALUES
+INSERT INTO complaints (id, ticket_number, student_id, category_id, title, description, block_id, hostel_block, room_number, priority, status, created_at, resolved_at) VALUES
 -- 1. In Progress Electrical Ticket
-(1, 'HC-20261101-0001', 5, 1, 'Ceiling fan regulator burnt and sparking', 'The speed regulator is sparking when turned to speed 3. Smells of burning plastic. Cannot operate fan.', 'Block A', 'A-102', 'high', 'in_progress', '2026-11-01 10:15:00', NULL),
+(1, 'HC-20261101-0001', 5, 1, 'Ceiling fan regulator burnt and sparking', 'The speed regulator is sparking when turned to speed 3. Smells of burning plastic. Cannot operate fan.', 1, 'Block A', 'A-102', 'high', 'in_progress', '2026-11-01 10:15:00', NULL),
 
 -- 2. Assigned Plumbing Ticket
-(2, 'HC-20261102-0002', 6, 2, 'Continuous tap leakage in bathroom sink', 'Water dripping constantly from cold water faucet. Water wastage and constant dripping noise.', 'Block B', 'B-204', 'normal', 'assigned', '2026-11-02 11:30:00', NULL),
+(2, 'HC-20261102-0002', 6, 2, 'Continuous tap leakage in bathroom sink', 'Water dripping constantly from cold water faucet. Water wastage and constant dripping noise.', 2, 'Block B', 'B-204', 'normal', 'assigned', '2026-11-02 11:30:00', NULL),
 
 -- 3. Pending Urgent Water Ticket
-(3, 'HC-20261103-0003', 7, 3, 'Water cooler on 3rd floor non-functional', 'The main drinking water cooler is not dispensing water. Entire floor has no drinking water supply.', 'Block A', 'A-310', 'urgent', 'pending', '2026-11-03 08:45:00', NULL),
+(3, 'HC-20261103-0003', 7, 3, 'Water cooler on 3rd floor non-functional', 'The main drinking water cooler is not dispensing water. Entire floor has no drinking water supply.', 1, 'Block A', 'A-310', 'urgent', 'pending', '2026-11-03 08:45:00', NULL),
 
 -- 4. Resolved Room Repair Ticket
-(4, 'HC-20261104-0004', 8, 5, 'Study chair leg joint broken', 'The wooden joint on the right rear chair leg has snapped. Dangerous to sit on.', 'Block C', 'C-115', 'low', 'resolved', '2026-11-04 14:00:00', '2026-11-05 16:30:00'),
+(4, 'HC-20261104-0004', 8, 5, 'Study chair leg joint broken', 'The wooden joint on the right rear chair leg has snapped. Dangerous to sit on.', 3, 'Block C', 'C-115', 'low', 'resolved', '2026-11-04 14:00:00', '2026-11-05 16:30:00'),
 
 -- 5. Closed Electrical Ticket
-(5, 'HC-20261105-0005', 5, 1, 'Corridor tube light flickering near room A-102', 'Tube light choke is humming loudly and flickering continuously since yesterday evening.', 'Block A', 'A-102', 'normal', 'closed', '2026-11-05 09:20:00', '2026-11-06 11:00:00');
+(5, 'HC-20261105-0005', 5, 1, 'Corridor tube light flickering near room A-102', 'Tube light choke is humming loudly and flickering continuously since yesterday evening.', 1, 'Block A', 'A-102', 'normal', 'closed', '2026-11-05 09:20:00', '2026-11-06 11:00:00');
 
 -- ----------------------------------------------------------------------------
 -- 5. SEED: complaint_assignments

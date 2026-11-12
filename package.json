@@ -1,6 +1,7 @@
 {
   "name": "hostelcare",
   "version": "1.0.0",
+  "type": "module",
   "description": "HostelCare — Hostel Maintenance & Complaint Management System (Full Stack PBL)",
   "main": "server.js",
   "scripts": {

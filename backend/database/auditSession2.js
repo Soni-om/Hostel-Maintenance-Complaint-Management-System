@@ -4,8 +4,8 @@
  * Cascade Behaviors, and Indexes
  */
 
-require('dotenv').config();
-const mysql = require('mysql2/promise');
+import 'dotenv/config';
+import mysql from 'mysql2/promise';
 
 async function runSession2Audit() {
   console.log('================================================================');
