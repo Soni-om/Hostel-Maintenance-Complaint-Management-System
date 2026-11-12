@@ -3,9 +3,6 @@
  */
 
 const Utils = {
-  /**
-   * Format ISO date string to human-friendly local format
-   */
   formatDate(dateString) {
     if (!dateString) return '—';
     const date = new Date(dateString);
@@ -18,17 +15,11 @@ const Utils = {
     });
   },
 
-  /**
-   * Render HTML Status Badge
-   */
   renderStatusBadge(status) {
     const normalized = (status || 'pending').toLowerCase().replace(/\s+/g, '');
     return `<span class="badge badge-${normalized}">${status}</span>`;
   },
 
-  /**
-   * Toast notification system
-   */
   showToast(message, type = 'info') {
     let toastContainer = document.getElementById('toast-container');
     if (!toastContainer) {
@@ -65,4 +56,10 @@ const Utils = {
     }, 4000);
   }
 };
+
+if (typeof window !== 'undefined') {
+  window.Utils = Utils;
+}
+
+export default Utils;
 

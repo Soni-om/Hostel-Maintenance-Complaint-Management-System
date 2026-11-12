@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,17 +9,21 @@
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/components.css">
 </head>
+
 <body>
   <!-- Header -->
   <header class="navbar">
     <div class="container navbar-content">
       <a href="/" class="brand">
         <span class="brand-icon">H</span>
-        <span>HostelCare <span style="font-size: var(--font-xs); font-weight: 500; color: var(--color-text-muted);">| Staff Desk</span></span>
+        <span>HostelCare <span style="font-size: var(--font-xs); font-weight: 500; color: var(--color-text-muted);">|
+            Staff Desk</span></span>
       </a>
       <div class="flex items-center gap-4">
-        <div id="staff-status-badge" style="font-size: var(--font-xs); color: var(--color-text-muted); display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--color-bg-muted); border-radius: var(--radius-full); border: 1px solid var(--color-border);">
-          <span id="staff-dot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-light);"></span>
+        <div id="staff-status-badge"
+          style="font-size: var(--font-xs); color: var(--color-text-muted); display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--color-bg-muted); border-radius: var(--radius-full); border: 1px solid var(--color-border);">
+          <span id="staff-dot"
+            style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-light);"></span>
           <span id="staff-status-label">Checking API...</span>
         </div>
         <a href="/" class="btn btn-secondary btn-sm">Home</a>
@@ -78,7 +83,8 @@
         <div style="font-size: 3rem; margin-bottom: 1rem;">🧰</div>
         <h3>No active maintenance assignments</h3>
         <p class="text-muted text-sm" style="max-width: 420px; margin: 0 auto;">
-          The staff complaint handling and status transition workflow (Pending → Assigned → In Progress → Resolved) will be active in Phase 3 (Sessions 10-12).
+          The staff complaint handling and status transition workflow (Pending → Assigned → In Progress → Resolved) will
+          be active in Phase 3 (Sessions 10-12).
         </p>
       </div>
     </div>
@@ -92,22 +98,29 @@
       const dot = document.getElementById('staff-dot');
       const label = document.getElementById('staff-status-label');
       try {
-        const data = await window.Api.checkHealth();
+        const data = await window.Api.checkHealth({ silent: true });
         if (data.database && data.database.status === 'connected') {
           dot.style.background = 'var(--color-success)';
           dot.style.boxShadow = '0 0 6px rgba(22, 163, 74, 0.6)';
           label.textContent = `Backend & DB Online (${data.database.latencyMs}ms)`;
         } else {
           dot.style.background = 'var(--color-warning)';
+          dot.style.boxShadow = 'none';
           label.textContent = 'API Online (DB Disconnected)';
         }
-      } catch {
-        dot.style.background = 'var(--color-danger)';
-        label.textContent = 'Backend Offline';
+      } catch (err) {
+        dot.style.boxShadow = 'none';
+        if (err.status === 503) {
+          dot.style.background = 'var(--color-warning)';
+          label.textContent = 'Service Degraded (DB Offline)';
+        } else {
+          dot.style.background = 'var(--color-danger)';
+          label.textContent = 'Backend Offline';
+        }
       }
     }
     document.addEventListener('DOMContentLoaded', checkStatus);
   </script>
 </body>
-</html>
 
+</html>

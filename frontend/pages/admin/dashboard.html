@@ -96,18 +96,25 @@
       const dot = document.getElementById('admin-dot');
       const label = document.getElementById('admin-status-label');
       try {
-        const data = await window.Api.checkHealth();
+        const data = await window.Api.checkHealth({ silent: true });
         if (data.database && data.database.status === 'connected') {
           dot.style.background = 'var(--color-success)';
           dot.style.boxShadow = '0 0 6px rgba(22, 163, 74, 0.6)';
           label.textContent = `Backend & DB Online (${data.database.latencyMs}ms)`;
         } else {
           dot.style.background = 'var(--color-warning)';
+          dot.style.boxShadow = 'none';
           label.textContent = 'API Online (DB Disconnected)';
         }
-      } catch {
-        dot.style.background = 'var(--color-danger)';
-        label.textContent = 'Backend Offline';
+      } catch (err) {
+        dot.style.boxShadow = 'none';
+        if (err.status === 503) {
+          dot.style.background = 'var(--color-warning)';
+          label.textContent = 'Service Degraded (DB Offline)';
+        } else {
+          dot.style.background = 'var(--color-danger)';
+          label.textContent = 'Backend Offline';
+        }
       }
     }
     document.addEventListener('DOMContentLoaded', checkStatus);

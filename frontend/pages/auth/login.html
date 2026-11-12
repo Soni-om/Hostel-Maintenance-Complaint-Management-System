@@ -10,7 +10,7 @@
 </head>
 <body style="justify-content: center; align-items: center; min-height: 100vh; padding: 2rem 1rem;">
 
-  <div class="card" style="width: 100%; max-width: 440px;">
+  <main class="card" style="width: 100%; max-width: 440px;">
     <div class="text-center" style="margin-bottom: 2rem;">
       <a href="/" class="brand" style="justify-content: center; margin-bottom: 0.75rem;">
         <span class="brand-icon">H</span>
@@ -50,7 +50,7 @@
         <span id="auth-label">Checking API...</span>
       </div>
     </div>
-  </div>
+  </main>
 
   <script src="/js/config.js"></script>
   <script src="/js/api.js"></script>
@@ -60,18 +60,25 @@
       const dot = document.getElementById('auth-dot');
       const label = document.getElementById('auth-label');
       try {
-        const data = await window.Api.checkHealth();
+        const data = await window.Api.checkHealth({ silent: true });
         if (data.database && data.database.status === 'connected') {
           dot.style.background = 'var(--color-success)';
           dot.style.boxShadow = '0 0 6px rgba(22, 163, 74, 0.6)';
           label.textContent = `Backend & MySQL Online (${data.database.latencyMs}ms)`;
         } else {
           dot.style.background = 'var(--color-warning)';
+          dot.style.boxShadow = 'none';
           label.textContent = 'API Online (Database Disconnected)';
         }
-      } catch {
-        dot.style.background = 'var(--color-danger)';
-        label.textContent = 'Backend Offline';
+      } catch (err) {
+        dot.style.boxShadow = 'none';
+        if (err.status === 503) {
+          dot.style.background = 'var(--color-warning)';
+          label.textContent = 'Service Degraded (DB Offline)';
+        } else {
+          dot.style.background = 'var(--color-danger)';
+          label.textContent = 'Backend Offline';
+        }
       }
     }
     document.addEventListener('DOMContentLoaded', checkStatus);

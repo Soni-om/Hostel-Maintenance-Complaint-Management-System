@@ -247,7 +247,7 @@
       const label = document.getElementById('status-label');
       
       try {
-        const data = await window.Api.checkHealth();
+        const data = await window.Api.checkHealth({ silent: true });
         const dbConnected = data.database && data.database.status === 'connected';
 
         if (dbConnected) {
