@@ -36,3 +36,4 @@ router.get('/', requireRole('admin'), UserController.listUsers);
 router.patch('/:id/status', requireRole('admin'), validateUserStatusRules, UserController.updateStatus);
 
 export default router;
+

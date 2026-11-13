@@ -438,6 +438,65 @@ async function runSession8Verification() {
     );
 
     // ------------------------------------------------------------------------
+    // Verification 18: Deactivated user blocked immediately on protected requests
+    // ------------------------------------------------------------------------
+    const deactivatedToken = generateToken({
+      id: provisionedUser.id,
+      email: tempStaffEmail,
+      role: 'staff',
+      name: provisionedUser.name
+    });
+    const deactRes = await requestJson(baseUrl, '/api/v1/staff/overview', {
+      headers: { 'Authorization': `Bearer ${deactivatedToken}` }
+    });
+    recordTest(
+      18,
+      'Deactivated user blocked immediately on protected requests (HTTP 403 ACCOUNT_INACTIVE)',
+      deactRes.status === 403 && deactRes.data.code === 'ACCOUNT_INACTIVE',
+      `HTTP ${deactRes.status}, code: ${deactRes.data.code}, message: "${deactRes.data.message}"`
+    );
+
+    // ------------------------------------------------------------------------
+    // Verification 19: Duplicate email on provisioning blocked (HTTP 409 Conflict)
+    // ------------------------------------------------------------------------
+    const dupRes = await requestJson(baseUrl, '/api/v1/users', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${adminToken}` },
+      body: {
+        name: 'Duplicate Staff Attempt',
+        email: tempStaffEmail,
+        password: 'Password@123',
+        role: 'staff'
+      }
+    });
+    recordTest(
+      19,
+      'Duplicate email on user provisioning is rejected with HTTP 409 Conflict',
+      dupRes.status === 409,
+      `HTTP ${dupRes.status}, message: "${dupRes.data?.message}"`
+    );
+
+    // ------------------------------------------------------------------------
+    // Verification 20: Weak password on provisioning blocked (HTTP 400 Bad Request)
+    // ------------------------------------------------------------------------
+    const weakPassRes = await requestJson(baseUrl, '/api/v1/users', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${adminToken}` },
+      body: {
+        name: 'Weak Pass Staff',
+        email: 'weak.staff@hostelcare.edu',
+        password: '123',
+        role: 'staff'
+      }
+    });
+    recordTest(
+      20,
+      'Short password (< 6 characters) on user provisioning is rejected with HTTP 400',
+      weakPassRes.status === 400,
+      `HTTP ${weakPassRes.status}, message: "${weakPassRes.data?.message}"`
+    );
+
+    // ------------------------------------------------------------------------
     // Clean up temporary test staff record
     // ------------------------------------------------------------------------
     if (provisionedUser?.id) {
@@ -445,12 +504,12 @@ async function runSession8Verification() {
     }
 
     // ------------------------------------------------------------------------
-    // Final Test 18: Database Relational Integrity (Exactly 8 Pristine Seed Users)
+    // Final Test 21: Database Relational Integrity (Exactly 8 Pristine Seed Users)
     // ------------------------------------------------------------------------
     const [userCount] = await pool.query('SELECT COUNT(*) AS total FROM users');
     const totalUsers = userCount[0].total;
     recordTest(
-      18,
+      21,
       'Database Relational Integrity: Exactly 8 pristine seed users remain in MySQL',
       totalUsers === 8,
       `Total users remaining in database: ${totalUsers} (1 Admin, 3 Staff, 4 Students)`
@@ -484,3 +543,4 @@ runSession8Verification().catch((err) => {
   console.error('Fatal Test Suite Error:', err);
   process.exit(1);
 });
+

@@ -31,3 +31,4 @@ router.get('/overview', requireRole('staff', 'admin'), (req, res) => {
 });
 
 export default router;
+
