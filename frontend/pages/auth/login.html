@@ -83,9 +83,51 @@
     }
     document.addEventListener('DOMContentLoaded', checkStatus);
 
-    document.getElementById('login-form').addEventListener('submit', (e) => {
+    const loginForm = document.getElementById('login-form');
+    loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      Utils.showToast('Authentication API endpoint will be integrated in Session 5.', 'info');
+      const submitBtn = loginForm.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Signing In...';
+
+        const result = await window.Api.post('/auth/login', { email, password });
+
+        // Save JWT authentication token
+        window.Api.setToken(result.token);
+
+        // Save safe user profile in localStorage
+        if (typeof localStorage !== 'undefined' && result.user) {
+          localStorage.setItem(window.CONFIG?.USER_KEY || 'hostelcare_user', JSON.stringify(result.user));
+        }
+
+        Utils.showToast('Login successful! Redirecting...', 'success');
+        loginForm.reset();
+
+        // Redirect according to user role
+        setTimeout(() => {
+          const role = (result.user?.role || '').toLowerCase();
+          if (role === 'student') {
+            window.location.href = '/pages/student/dashboard.html';
+          } else if (role === 'staff') {
+            window.location.href = '/pages/staff/dashboard.html';
+          } else if (role === 'admin') {
+            window.location.href = '/pages/admin/dashboard.html';
+          } else {
+            window.location.href = '/';
+          }
+        }, 1000);
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        const errorMsg = err.data?.message || err.message || 'Login failed. Please check your credentials.';
+        Utils.showToast(errorMsg, 'danger');
+      }
     });
   </script>
 </body>

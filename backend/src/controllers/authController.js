@@ -5,6 +5,7 @@
 
 import bcrypt from 'bcryptjs';
 import UserModel from '../models/userModel.js';
+import { generateToken } from '../utils/jwt.js';
 
 const BCRYPT_SALT_ROUNDS = 10;
 
@@ -83,6 +84,80 @@ const AuthController = {
       return res.status(500).json({
         success: false,
         message: 'An unexpected internal error occurred while processing registration. Please try again.'
+      });
+    }
+  },
+
+  /**
+   * User Authentication & JWT Issuance
+   * POST /api/auth/login or /api/v1/auth/login
+   */
+  async login(req, res) {
+    try {
+      const { email, password } = req.body;
+
+      // 1. Normalize email
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // 2. Query user from database
+      const user = await UserModel.findByEmail(normalizedEmail);
+      if (!user) {
+        // Return 401 Unauthorized with generic message to prevent account enumeration
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email or password.'
+        });
+      }
+
+      // 3. Verify password hash using bcrypt.compare
+      const isMatch = await bcrypt.compare(password, user.password_hash);
+      if (!isMatch) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email or password.'
+        });
+      }
+
+      // 4. Verify account status
+      if (user.account_status !== 'active') {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account is currently inactive or suspended. Please contact the hostel administration.'
+        });
+      }
+
+      // 5. Generate time-limited JWT token
+      const token = generateToken({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name
+      });
+
+      // 6. Return safe user data without password_hash
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful.',
+        token,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          account_status: user.account_status,
+          phone: user.phone,
+          block_id: user.block_id,
+          hostel_block: user.hostel_block,
+          room_number: user.room_number,
+          staff_designation: user.staff_designation,
+          created_at: user.created_at
+        }
+      });
+    } catch (error) {
+      console.error('Login Controller Error:', error.message);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred during login. Please try again.'
       });
     }
   }

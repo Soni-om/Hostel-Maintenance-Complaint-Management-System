@@ -22,7 +22,7 @@
           <span id="student-status-label">Checking API...</span>
         </div>
         <a href="/" class="btn btn-secondary btn-sm">Home</a>
-        <a href="/pages/auth/login.html" class="btn btn-primary btn-sm">Log Out</a>
+        <a href="/pages/auth/login.html" onclick="if(window.Api){window.Api.clearAuth();}" class="btn btn-primary btn-sm">Log Out</a>
       </div>
     </div>
   </header>

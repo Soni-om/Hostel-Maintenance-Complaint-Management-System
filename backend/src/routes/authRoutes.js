@@ -5,7 +5,7 @@
 
 import { Router } from 'express';
 import AuthController from '../controllers/authController.js';
-import { validateRegistrationRules } from '../middleware/validationMiddleware.js';
+import { validateRegistrationRules, validateLoginRules } from '../middleware/validationMiddleware.js';
 
 const router = Router();
 
@@ -16,5 +16,11 @@ const router = Router();
  */
 router.post('/register', validateRegistrationRules, AuthController.register);
 
-export default router;
+/**
+ * @route   POST /api/auth/login or /api/v1/auth/login
+ * @desc    User login & JWT token issuance
+ * @access  Public
+ */
+router.post('/login', validateLoginRules, AuthController.login);
 
+export default router;

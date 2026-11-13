@@ -104,3 +104,22 @@ export const validateRegistrationRules = [
 
   handleValidationErrors
 ];
+
+/**
+ * Validation rules for User Login (POST /api/auth/login)
+ */
+export const validateLoginRules = [
+  body('email')
+    .isString().withMessage('Email address must be a string.')
+    .trim()
+    .notEmpty().withMessage('Email address is required.')
+    .isEmail().withMessage('Please provide a valid email address.')
+    .normalizeEmail({ gmail_remove_dots: false }),
+
+  body('password')
+    .isString().withMessage('Password must be a string.')
+    .notEmpty().withMessage('Password is required.'),
+
+  handleValidationErrors
+];
+
