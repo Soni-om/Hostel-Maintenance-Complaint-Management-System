@@ -37,7 +37,7 @@
       </div>
       <div class="flex gap-2">
         <button class="btn btn-secondary btn-sm" onclick="alert('Category management scheduled for Session 14.')">Categories</button>
-        <button class="btn btn-primary btn-sm" onclick="alert('User provisioning scheduled for Session 13.')">Manage Users</button>
+        <button class="btn btn-primary btn-sm" onclick="toggleProvisioningModal()">+ Provision Staff</button>
       </div>
     </div>
 
@@ -53,14 +53,14 @@
       <div class="stat-card">
         <div>
           <div class="stat-label">Registered Students</div>
-          <div class="stat-value">0</div>
+          <div class="stat-value" id="admin-student-count">4</div>
         </div>
         <div style="font-size: 2rem;">🎓</div>
       </div>
       <div class="stat-card">
         <div>
           <div class="stat-label">Active Staff</div>
-          <div class="stat-value">0</div>
+          <div class="stat-value" id="admin-staff-count">3</div>
         </div>
         <div style="font-size: 2rem;">👷</div>
       </div>
@@ -70,6 +70,50 @@
           <div class="stat-value">0.0</div>
         </div>
         <div style="font-size: 2rem;">⏱️</div>
+      </div>
+    </div>
+
+    <!-- Staff Provisioning Panel (Session 8 Feature) -->
+    <div class="card" id="provisioning-card" style="margin-bottom: 2rem; display: none;">
+      <div class="card-header flex justify-between items-center">
+        <h3 class="card-title">Controlled Staff Account Provisioning</h3>
+        <button class="btn btn-secondary btn-sm" onclick="toggleProvisioningModal()">Close</button>
+      </div>
+      <div style="padding: 1.5rem;">
+        <form id="provision-staff-form" class="grid grid-cols-2" style="gap: 1rem;">
+          <div>
+            <label class="form-label" for="staff-name">Staff Member Full Name *</label>
+            <input type="text" id="staff-name" class="form-control" placeholder="e.g. Anand Varma" required>
+          </div>
+          <div>
+            <label class="form-label" for="staff-email">Official Email Address *</label>
+            <input type="email" id="staff-email" class="form-control" placeholder="e.g. anand.carpenter@hostelcare.edu" required>
+          </div>
+          <div>
+            <label class="form-label" for="staff-password">Initial Temporary Password *</label>
+            <input type="password" id="staff-password" class="form-control" placeholder="Minimum 6 characters" required minlength="6">
+          </div>
+          <div>
+            <label class="form-label" for="staff-designation">Maintenance Designation *</label>
+            <input type="text" id="staff-designation" class="form-control" placeholder="e.g. Carpenter, Electrician, Plumber" required>
+          </div>
+          <div>
+            <label class="form-label" for="staff-block">Assigned Hostel Block</label>
+            <select id="staff-block" class="form-control">
+              <option value="Block A">Block A (North Wing)</option>
+              <option value="Block B">Block B (South Wing)</option>
+              <option value="Block C">Block C (East Wing)</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="staff-phone">Contact Phone Number</label>
+            <input type="tel" id="staff-phone" class="form-control" placeholder="e.g. +91 9899112233">
+          </div>
+          <div style="grid-column: span 2; display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
+            <button type="button" class="btn btn-secondary" onclick="toggleProvisioningModal()">Cancel</button>
+            <button type="submit" id="btn-submit-provision" class="btn btn-primary">Create Staff Account</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -124,7 +168,77 @@
         }
       }
     }
-    document.addEventListener('DOMContentLoaded', checkStatus);
+
+    function toggleProvisioningModal() {
+      const card = document.getElementById('provisioning-card');
+      card.style.display = card.style.display === 'none' ? 'block' : 'none';
+      if (card.style.display === 'block') {
+        document.getElementById('staff-name').focus();
+      }
+    }
+
+    async function loadUserMetrics() {
+      try {
+        const [studentRes, staffRes] = await Promise.all([
+          window.Api.get('/users?role=student', { silent: true }).catch(() => null),
+          window.Api.get('/users?role=staff', { silent: true }).catch(() => null)
+        ]);
+
+        if (studentRes && studentRes.pagination) {
+          document.getElementById('admin-student-count').textContent = studentRes.pagination.total;
+        }
+        if (staffRes && staffRes.pagination) {
+          document.getElementById('admin-staff-count').textContent = staffRes.pagination.total;
+        }
+      } catch (e) {
+        console.warn('Could not refresh user metrics:', e.message);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      checkStatus();
+      loadUserMetrics();
+
+      const form = document.getElementById('provision-staff-form');
+      if (form) {
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const submitBtn = document.getElementById('btn-submit-provision');
+          const originalText = submitBtn.textContent;
+
+          const payload = {
+            name: document.getElementById('staff-name').value.trim(),
+            email: document.getElementById('staff-email').value.trim(),
+            password: document.getElementById('staff-password').value,
+            role: 'staff',
+            staff_designation: document.getElementById('staff-designation').value.trim(),
+            hostel_block: document.getElementById('staff-block').value,
+            phone: document.getElementById('staff-phone').value.trim() || undefined
+          };
+
+          try {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Provisioning...';
+
+            const response = await window.Api.post('/users', payload);
+            if (window.Utils) {
+              window.Utils.showToast(response.message || 'Staff account created successfully!', 'success');
+            }
+            form.reset();
+            toggleProvisioningModal();
+            loadUserMetrics();
+          } catch (err) {
+            const msg = err.data?.message || err.message || 'Failed to provision staff account.';
+            if (window.Utils) {
+              window.Utils.showToast(msg, 'danger');
+            }
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+        });
+      }
+    });
   </script>
 </body>
 </html>

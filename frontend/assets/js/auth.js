@@ -1,7 +1,8 @@
 /**
  * HostelCare — Shared Frontend Authentication & Session Manager
  * Provides centralized session state, profile fetching from /api/v1/auth/me,
- * page-level role authorization guards, and client-side session cleanup.
+ * page-level role authorization guards, role-based navigation visibility,
+ * and client-side session cleanup.
  */
 
 const Auth = {
@@ -58,6 +59,18 @@ const Auth = {
   getRole() {
     const user = this.getUser();
     return (user?.role || '').toLowerCase();
+  },
+
+  /**
+   * Checks whether the current user has any of the specified roles
+   * @param {...string} roles Permitted roles
+   * @returns {boolean}
+   */
+  hasRole(...roles) {
+    const current = this.getRole();
+    if (!current) return false;
+    const normalized = roles.map((r) => r.toLowerCase().trim());
+    return normalized.includes(current);
   },
 
   /**
@@ -162,7 +175,7 @@ const Auth = {
     // Queries /auth/me to confirm account has not been suspended, deactivated, or deleted.
     this.fetchProfile()
       .then((user) => {
-        // Update user UI display elements if present
+        // Update user UI display elements and role-based links
         this.renderUserInfo(user);
       })
       .catch((err) => {
@@ -183,13 +196,14 @@ const Auth = {
   },
 
   /**
-   * Dynamically populates user details (name, role, room, block) into the UI
+   * Dynamically populates user details into the UI and adjusts
+   * navigation visibility based on role permissions.
    * @param {object} user 
    */
   renderUserInfo(user) {
     if (!user || typeof document === 'undefined') return;
 
-    // Update elements with data-user-field attribute
+    // 1. Update elements with data-user-field attribute
     document.querySelectorAll('[data-user-field]').forEach((el) => {
       const field = el.getAttribute('data-user-field');
       if (user[field] !== undefined && user[field] !== null) {
@@ -197,7 +211,7 @@ const Auth = {
       }
     });
 
-    // Populate common ID selectors
+    // 2. Populate common ID selectors
     const nameEl = document.getElementById('user-display-name');
     if (nameEl) nameEl.textContent = user.name;
 
@@ -211,6 +225,28 @@ const Auth = {
     if (hostelEl && (user.hostel_block || user.room_number)) {
       hostelEl.textContent = `${user.hostel_block || 'Hostel'} — Room ${user.room_number || 'N/A'}`;
     }
+
+    // 3. Role-Based Navigation & Action Visibility
+    // Elements decorated with data-allowed-roles="staff,admin" are shown only if permitted
+    const currentRole = (user.role || '').toLowerCase();
+    document.querySelectorAll('[data-allowed-roles]').forEach((el) => {
+      const allowed = el.getAttribute('data-allowed-roles').toLowerCase().split(',').map((r) => r.trim());
+      if (allowed.includes(currentRole)) {
+        el.style.display = '';
+      } else {
+        el.style.display = 'none';
+      }
+    });
+
+    // Elements decorated with data-forbidden-roles="student" are hidden for matching roles
+    document.querySelectorAll('[data-forbidden-roles]').forEach((el) => {
+      const forbidden = el.getAttribute('data-forbidden-roles').toLowerCase().split(',').map((r) => r.trim());
+      if (forbidden.includes(currentRole)) {
+        el.style.display = 'none';
+      } else {
+        el.style.display = '';
+      }
+    });
   },
 
   /**
@@ -228,7 +264,7 @@ const Auth = {
         });
       });
 
-      // Render cached user information if available
+      // Render cached user information and role visibility if available
       const cached = this.getUser();
       if (cached) {
         this.renderUserInfo(cached);

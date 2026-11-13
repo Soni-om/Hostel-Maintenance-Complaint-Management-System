@@ -123,3 +123,75 @@ export const validateLoginRules = [
   handleValidationErrors
 ];
 
+/**
+ * Validation rules for Controlled Staff & Admin Account Provisioning (POST /api/users)
+ * Accessible exclusively by authorized administrators
+ */
+export const validateUserProvisioningRules = [
+  body('name')
+    .isString().withMessage('Full name must be a string.')
+    .trim()
+    .notEmpty().withMessage('Full name is required.')
+    .isLength({ min: 2, max: 100 }).withMessage('Full name must be between 2 and 100 characters.')
+    .matches(/^[a-zA-Z\s.'-]+$/).withMessage('Full name can only contain letters, spaces, hyphens, and periods.'),
+
+  body('email')
+    .isString().withMessage('Email address must be a string.')
+    .trim()
+    .notEmpty().withMessage('Email address is required.')
+    .isEmail().withMessage('Please provide a valid email address.')
+    .normalizeEmail({ gmail_remove_dots: false })
+    .isLength({ max: 150 }).withMessage('Email address cannot exceed 150 characters.'),
+
+  body('password')
+    .isString().withMessage('Password must be a string.')
+    .notEmpty().withMessage('Password is required.')
+    .isLength({ min: 6 }).withMessage('Password must be at least 6 characters long.')
+    .isLength({ max: 128 }).withMessage('Password cannot exceed 128 characters.'),
+
+  body('role')
+    .isString().withMessage('Role must be a string.')
+    .trim()
+    .notEmpty().withMessage('Role is required.')
+    .custom((val) => {
+      const normalized = val.toLowerCase();
+      if (!['staff', 'admin'].includes(normalized)) {
+        throw new Error("Invalid provisioning role. Only 'staff' and 'admin' roles can be provisioned via this endpoint.");
+      }
+      return true;
+    }),
+
+  body('phone')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('Phone number must be a string.')
+    .trim()
+    .isLength({ max: 20 }).withMessage('Phone number cannot exceed 20 characters.')
+    .matches(/^[+0-9\s()-]+$/).withMessage('Please provide a valid phone number format.'),
+
+  body('staff_designation')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('Staff designation must be a string.')
+    .trim()
+    .isLength({ max: 100 }).withMessage('Staff designation cannot exceed 100 characters.'),
+
+  body('hostel_block')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('Hostel block must be a string.')
+    .trim()
+    .isLength({ max: 50 }).withMessage('Hostel block name cannot exceed 50 characters.'),
+
+  handleValidationErrors
+];
+
+/**
+ * Validation rules for User Account Status update (PATCH /api/users/:id/status)
+ */
+export const validateUserStatusRules = [
+  body('account_status')
+    .isString().withMessage('account_status must be a string.')
+    .trim()
+    .toLowerCase()
+    .isIn(['active', 'inactive']).withMessage("account_status must be either 'active' or 'inactive'."),
+
+  handleValidationErrors
+];

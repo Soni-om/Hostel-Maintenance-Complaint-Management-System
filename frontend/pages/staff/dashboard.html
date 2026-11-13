@@ -126,7 +126,24 @@
         }
       }
     }
-    document.addEventListener('DOMContentLoaded', checkStatus);
+    async function loadStaffOverview() {
+      try {
+        const res = await window.Api.get('/staff/overview', { silent: true });
+        if (res && res.data) {
+          const userEl = document.getElementById('user-display-name');
+          if (userEl && res.data.designation) {
+            userEl.textContent = `${res.data.staffName} (${res.data.designation})`;
+          }
+        }
+      } catch (err) {
+        console.warn('Staff overview API:', err.message);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      checkStatus();
+      loadStaffOverview();
+    });
   </script>
 </body>
 

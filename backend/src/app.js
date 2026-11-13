@@ -9,6 +9,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pool, { testConnection } from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import staffRoutes from './routes/staffRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -128,6 +130,14 @@ app.get('/', (req, res) => {
 // ==========================================
 app.use('/api/auth', authRoutes);
 app.use(`${apiPrefix}/auth`, authRoutes);
+
+// User Administration & Account Provisioning (Admin only)
+app.use('/api/users', userRoutes);
+app.use(`${apiPrefix}/users`, userRoutes);
+
+// Staff Operations & Maintenance Queue (Staff & Admin only)
+app.use('/api/staff', staffRoutes);
+app.use(`${apiPrefix}/staff`, staffRoutes);
 
 // ==========================================
 // 5. Centralized 404 Route Handler

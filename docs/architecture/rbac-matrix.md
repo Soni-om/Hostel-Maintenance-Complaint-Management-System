@@ -32,6 +32,28 @@
 | **Complaints: Feedback** | `POST /api/v1/complaints/:id/feedback` | ✅ | ❌ | ❌ | Student owner only, once complaint is `Resolved`. |
 | **Categories: List** | `GET /api/v1/categories` | ✅ | ✅ | ✅ | Publicly visible to all authenticated roles. |
 | **Categories: Manage** | `POST/PUT/DELETE /api/v1/categories` | ❌ | ❌ | ✅ | Admin only. |
-| **Users: List & Manage** | `/api/v1/users/*` | ❌ | ❌ | ✅ | Admin only. |
+| **Users: Provision Staff/Admin** | `POST /api/v1/users` | ❌ | ❌ | ✅ | Admin only. Controlled account creation. |
+| **Users: List Directory** | `GET /api/v1/users` | ❌ | ❌ | ✅ | Admin only. Paginated with role/status filters. |
+| **Users: Toggle Status** | `PATCH /api/v1/users/:id/status` | ❌ | ❌ | ✅ | Admin only. Cannot self-deactivate. |
+| **Staff: Operations Overview** | `GET /api/v1/staff/overview` | ❌ | ✅ | ✅ | Staff & Admin only. Maintenance queue overview. |
 | **Stats: Dashboard** | `GET /api/v1/stats/dashboard` | ✅ | ✅ | ✅ | Scoped dynamically per role context. |
+
+---
+
+## 3. Comprehensive Endpoint Security & Status Code Matrix
+
+| HTTP Method | Endpoint | Authentication | Allowed Roles | Ownership & Policy Restrictions | Status Codes |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/auth/register` | None (Public) | Public | Role forced to `student`. Public elevation attempts return 403. | `201`, `400`, `403`, `409` |
+| `POST` | `/api/v1/auth/login` | None (Public) | All Roles | Account must be `active`. bcrypt verification. Generic 401 error. | `200`, `400`, `401`, `403` |
+| `GET` | `/api/v1/auth/me` | Bearer JWT | `student`, `staff`, `admin` | Live DB check (`findById`). Excludes `password_hash`. Account must be `active`. | `200`, `401`, `403` |
+| `POST` | `/api/v1/auth/logout` | Optional Bearer | All Roles | Client-side token discard acknowledgment. | `200` |
+| `POST` | `/api/v1/users` | Bearer JWT | `admin` | Admin can provision `staff` and delegated `admin` accounts. BCrypt 10 rounds. | `201`, `400`, `401`, `403`, `409` |
+| `GET` | `/api/v1/users` | Bearer JWT | `admin` | Returns user directory. Never leaks `password_hash`. Paginated. | `200`, `401`, `403` |
+| `PATCH` | `/api/v1/users/:id/status` | Bearer JWT | `admin` | Cannot deactivate own admin account. | `200`, `400`, `401`, `403`, `404` |
+| `GET` | `/api/v1/staff/overview` | Bearer JWT | `staff`, `admin` | Maintenance staff dashboard metrics. Students forbidden (403). | `200`, `401`, `403` |
+| `POST` | `/api/v1/complaints` | Bearer JWT | `student` | Students only. Auto-assigned ticket `HC-YYYYMMDD-XXXX`. | `201`, `400`, `401`, `403` |
+| `GET` | `/api/v1/complaints` | Bearer JWT | All Roles | Student sees own tickets; Staff sees domain; Admin sees all. | `200`, `401`, `403` |
+| `GET` | `/api/v1/complaints/:id` | Bearer JWT | All Roles | Student owner only (403 if unowned); Staff/Admin authorized. | `200`, `401`, `403`, `404` |
+
 
