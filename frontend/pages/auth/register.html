@@ -113,9 +113,38 @@
     }
     document.addEventListener('DOMContentLoaded', checkStatus);
 
-    document.getElementById('register-form').addEventListener('submit', (e) => {
+    const registerForm = document.getElementById('register-form');
+    registerForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      Utils.showToast('Registration API endpoint will be integrated in Session 5.', 'info');
+      const submitBtn = registerForm.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+
+      const payload = {
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        hostel_block: document.getElementById('hostel_block').value,
+        room_number: document.getElementById('room_number').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        password: document.getElementById('password').value
+      };
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Registering Account...';
+
+        const result = await window.Api.post('/auth/register', payload);
+        Utils.showToast(result.message || 'Registration successful! Redirecting to login...', 'success');
+        registerForm.reset();
+
+        setTimeout(() => {
+          window.location.href = '/pages/auth/login.html';
+        }, 1500);
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        const errorMsg = err.data?.message || err.message || 'Registration failed. Please check your input.';
+        Utils.showToast(errorMsg, 'danger');
+      }
     });
   </script>
 </body>

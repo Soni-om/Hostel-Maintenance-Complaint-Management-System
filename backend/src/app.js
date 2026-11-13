@@ -8,6 +8,7 @@ import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pool, { testConnection } from './config/db.js';
+import authRoutes from './routes/authRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -123,7 +124,13 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// 4. Centralized 404 Route Handler
+// 4. Feature Routes (Authentication & Identity)
+// ==========================================
+app.use('/api/auth', authRoutes);
+app.use(`${apiPrefix}/auth`, authRoutes);
+
+// ==========================================
+// 5. Centralized 404 Route Handler
 // ==========================================
 app.use('/api/*', (req, res) => {
   res.status(404).json({
@@ -133,7 +140,7 @@ app.use('/api/*', (req, res) => {
 });
 
 // ==========================================
-// 5. Centralized Error Handling Middleware
+// 6. Centralized Error Handling Middleware
 // ==========================================
 app.use((err, req, res, next) => {
   // Handle invalid/malformed JSON syntax from express.json()
