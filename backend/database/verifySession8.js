@@ -325,21 +325,30 @@ async function runSession8Verification() {
     );
 
     // ------------------------------------------------------------------------
-    // Verification 13: Request body role manipulation is rejected
+    // Verification 13: Admin cannot create Admin accounts (HTTP 400 Bad Request)
+    // Policy: Administrator accounts are strictly system-seeded and cannot be created via the API
     // ------------------------------------------------------------------------
-    // 13a: Non-permitted role on POST /api/v1/users (e.g. 'superadmin')
-    const t13a = await requestJson(baseUrl, '/api/v1/users', {
+    const t13 = await requestJson(baseUrl, '/api/v1/users', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${adminToken}` },
       body: {
-        name: 'Invalid Role Attempt',
-        email: 'invalid.role@hostelcare.edu',
+        name: 'Attempted Second Admin',
+        email: tempAdminEmail,
         password: 'Password@123',
-        role: 'superadmin'
+        role: 'admin'
       }
     });
-    // 13b: Student role on POST /api/v1/users (Student must self-register, not provisioned)
-    const t13b = await requestJson(baseUrl, '/api/v1/users', {
+    recordTest(
+      13,
+      'Admin cannot create Admin accounts via API (HTTP 400 Bad Request — System Seeded Policy)',
+      t13.status === 400 && (t13.data?.message?.includes('system-seeded') || t13.data?.errors?.[0]?.msg?.includes('system-seeded')),
+      `HTTP ${t13.status}, message: "${t13.data?.message || t13.data?.errors?.[0]?.msg}"`
+    );
+
+    // ------------------------------------------------------------------------
+    // Verification 14: Admin cannot create Student accounts via API (HTTP 400 Bad Request)
+    // ------------------------------------------------------------------------
+    const t14 = await requestJson(baseUrl, '/api/v1/users', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${adminToken}` },
       body: {
@@ -349,16 +358,73 @@ async function runSession8Verification() {
         role: 'student'
       }
     });
-    const roleManipulationPassed = t13a.status === 400 && t13b.status === 400;
     recordTest(
-      13,
-      'Request body role manipulation is rejected with HTTP 400 Validation Error',
-      roleManipulationPassed,
-      `Invalid 'superadmin' role: HTTP ${t13a.status} ("${t13a.data?.message}"), Invalid 'student' role: HTTP ${t13b.status}`
+      14,
+      'Admin cannot create Student accounts via API (HTTP 400 Bad Request)',
+      t14.status === 400,
+      `HTTP ${t14.status}, message: "${t14.data?.message || t14.data?.errors?.[0]?.msg}"`
     );
 
     // ------------------------------------------------------------------------
-    // Verification 14: Direct dashboard URL access is protected in frontend HTML
+    // Verification 15: Admin cannot create arbitrary role accounts (HTTP 400 Bad Request)
+    // ------------------------------------------------------------------------
+    const t15 = await requestJson(baseUrl, '/api/v1/users', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${adminToken}` },
+      body: {
+        name: 'Invalid Superadmin Attempt',
+        email: 'invalid.superadmin@hostelcare.edu',
+        password: 'Password@123',
+        role: 'superadmin'
+      }
+    });
+    recordTest(
+      15,
+      'Admin cannot create arbitrary role accounts (HTTP 400 Bad Request)',
+      t15.status === 400,
+      `HTTP ${t15.status}, message: "${t15.data?.message || t15.data?.errors?.[0]?.msg}"`
+    );
+
+    // ------------------------------------------------------------------------
+    // Verification 16: Seeded Admin can still log in (HTTP 200 OK)
+    // ------------------------------------------------------------------------
+    const adminLoginRes = await requestJson(baseUrl, '/api/auth/login', {
+      method: 'POST',
+      body: {
+        email: 'admin@hostelcare.edu',
+        password: 'Password@123'
+      }
+    });
+    recordTest(
+      16,
+      'Seeded Admin can still log in successfully (HTTP 200 OK with valid JWT)',
+      adminLoginRes.status === 200 && Boolean(adminLoginRes.data?.token) && adminLoginRes.data?.user?.role === 'admin',
+      `HTTP ${adminLoginRes.status}, role: "${adminLoginRes.data?.user?.role}", token present: ${Boolean(adminLoginRes.data?.token)}`
+    );
+
+    // ------------------------------------------------------------------------
+    // Verification 17: Existing Staff accounts continue working (Login & Overview 200 OK)
+    // ------------------------------------------------------------------------
+    const staffLoginRes = await requestJson(baseUrl, '/api/auth/login', {
+      method: 'POST',
+      body: {
+        email: 'rajesh.electrician@hostelcare.edu',
+        password: 'Password@123'
+      }
+    });
+    const staffOverviewRes = await requestJson(baseUrl, '/api/v1/staff/overview', {
+      headers: { 'Authorization': `Bearer ${staffToken}` }
+    });
+    const staffWorking = staffLoginRes.status === 200 && staffOverviewRes.status === 200;
+    recordTest(
+      17,
+      'Existing Staff accounts continue working (Login & Operational Overview HTTP 200 OK)',
+      staffWorking,
+      `Staff login HTTP: ${staffLoginRes.status}, Staff overview HTTP: ${staffOverviewRes.status}`
+    );
+
+    // ------------------------------------------------------------------------
+    // Verification 18: Direct dashboard URL access is protected in frontend HTML
     // ------------------------------------------------------------------------
     const studentDashPath = path.join(rootDir, 'frontend', 'pages', 'student', 'dashboard.html');
     const staffDashPath = path.join(rootDir, 'frontend', 'pages', 'staff', 'dashboard.html');
@@ -373,14 +439,14 @@ async function runSession8Verification() {
     const aGuarded = aContent.includes("requireAuth(['admin'])");
 
     recordTest(
-      14,
+      18,
       'Direct dashboard URL access is protected with role-specific guards in HTML pages',
       sGuarded && stGuarded && aGuarded,
       `Student guard: ${sGuarded}, Staff guard: ${stGuarded}, Admin guard: ${aGuarded}`
     );
 
     // ------------------------------------------------------------------------
-    // Verification 15: Session 7 authentication continues working & regression checks
+    // Verification 19: Session 7 authentication continues working & regression checks
     // ------------------------------------------------------------------------
     const meRes = await requestJson(baseUrl, '/api/v1/auth/me', {
       headers: { 'Authorization': `Bearer ${studentToken}` }
@@ -389,32 +455,14 @@ async function runSession8Verification() {
     const s7StillWorking = meRes.status === 200 && meRes.data?.user?.id === studentUser.id && logoutRes.status === 200;
 
     recordTest(
-      15,
+      19,
       'Session 7 authentication (GET /auth/me & POST /auth/logout) continues working perfectly',
       s7StillWorking,
       `/auth/me HTTP: ${meRes.status}, user: "${meRes.data?.user?.name}", /auth/logout HTTP: ${logoutRes.status}`
     );
 
     // ------------------------------------------------------------------------
-    // Additional Test 16: Staff Operational Overview API works for Staff & Admin
-    // ------------------------------------------------------------------------
-    const staffOverviewRes = await requestJson(baseUrl, '/api/v1/staff/overview', {
-      headers: { 'Authorization': `Bearer ${staffToken}` }
-    });
-    const adminStaffOverviewRes = await requestJson(baseUrl, '/api/v1/staff/overview', {
-      headers: { 'Authorization': `Bearer ${adminToken}` }
-    });
-    const staffOverviewPassed = staffOverviewRes.status === 200 && adminStaffOverviewRes.status === 200;
-
-    recordTest(
-      16,
-      'Staff Operational Overview API accessible by Staff and Admin',
-      staffOverviewPassed,
-      `Staff caller HTTP: ${staffOverviewRes.status}, Admin caller HTTP: ${adminStaffOverviewRes.status}`
-    );
-
-    // ------------------------------------------------------------------------
-    // Additional Test 17: Admin Account Status Administration & Self-Deactivation Protection
+    // Verification 20: Admin Account Status Administration & Self-Deactivation Protection
     // ------------------------------------------------------------------------
     // Attempt self-deactivation by admin (must be rejected)
     const selfDeactivateRes = await requestJson(baseUrl, `/api/v1/users/${adminUser.id}/status`, {
@@ -431,14 +479,14 @@ async function runSession8Verification() {
 
     const statusAdminPassed = selfDeactivateRes.status === 400 && toggleStaffRes.status === 200;
     recordTest(
-      17,
+      20,
       'Admin Account Status Management prevents self-deactivation and toggles target user status',
       statusAdminPassed,
       `Self-deactivation rejected: HTTP ${selfDeactivateRes.status} ("${selfDeactivateRes.data?.message}"), Target toggle: HTTP ${toggleStaffRes.status}`
     );
 
     // ------------------------------------------------------------------------
-    // Verification 18: Deactivated user blocked immediately on protected requests
+    // Verification 21: Deactivated user blocked immediately on protected requests
     // ------------------------------------------------------------------------
     const deactivatedToken = generateToken({
       id: provisionedUser.id,
@@ -450,14 +498,14 @@ async function runSession8Verification() {
       headers: { 'Authorization': `Bearer ${deactivatedToken}` }
     });
     recordTest(
-      18,
+      21,
       'Deactivated user blocked immediately on protected requests (HTTP 403 ACCOUNT_INACTIVE)',
       deactRes.status === 403 && deactRes.data.code === 'ACCOUNT_INACTIVE',
       `HTTP ${deactRes.status}, code: ${deactRes.data.code}, message: "${deactRes.data.message}"`
     );
 
     // ------------------------------------------------------------------------
-    // Verification 19: Duplicate email on provisioning blocked (HTTP 409 Conflict)
+    // Verification 22: Duplicate email on provisioning blocked (HTTP 409 Conflict)
     // ------------------------------------------------------------------------
     const dupRes = await requestJson(baseUrl, '/api/v1/users', {
       method: 'POST',
@@ -470,14 +518,14 @@ async function runSession8Verification() {
       }
     });
     recordTest(
-      19,
+      22,
       'Duplicate email on user provisioning is rejected with HTTP 409 Conflict',
       dupRes.status === 409,
       `HTTP ${dupRes.status}, message: "${dupRes.data?.message}"`
     );
 
     // ------------------------------------------------------------------------
-    // Verification 20: Weak password on provisioning blocked (HTTP 400 Bad Request)
+    // Verification 23: Weak password on provisioning blocked (HTTP 400 Bad Request)
     // ------------------------------------------------------------------------
     const weakPassRes = await requestJson(baseUrl, '/api/v1/users', {
       method: 'POST',
@@ -490,7 +538,7 @@ async function runSession8Verification() {
       }
     });
     recordTest(
-      20,
+      23,
       'Short password (< 6 characters) on user provisioning is rejected with HTTP 400',
       weakPassRes.status === 400,
       `HTTP ${weakPassRes.status}, message: "${weakPassRes.data?.message}"`
@@ -504,15 +552,27 @@ async function runSession8Verification() {
     }
 
     // ------------------------------------------------------------------------
-    // Final Test 21: Database Relational Integrity (Exactly 8 Pristine Seed Users)
+    // Verification 24: Database Relational Integrity (Exactly 8 Pristine Seed Users)
     // ------------------------------------------------------------------------
     const [userCount] = await pool.query('SELECT COUNT(*) AS total FROM users');
     const totalUsers = userCount[0].total;
     recordTest(
-      21,
+      24,
       'Database Relational Integrity: Exactly 8 pristine seed users remain in MySQL',
       totalUsers === 8,
       `Total users remaining in database: ${totalUsers} (1 Admin, 3 Staff, 4 Students)`
+    );
+
+    // ------------------------------------------------------------------------
+    // Verification 25: Database Security: Exactly 1 seeded Admin account exists
+    // ------------------------------------------------------------------------
+    const [adminRows] = await pool.query('SELECT id, name, email, role FROM users WHERE role = ?', ['admin']);
+    const onlySeededAdmin = adminRows.length === 1 && adminRows[0].email === 'admin@hostelcare.edu';
+    recordTest(
+      25,
+      'Database Security: Database has no unauthorized Admin accounts (only 1 seeded admin@hostelcare.edu)',
+      onlySeededAdmin,
+      `Admin count: ${adminRows.length}, accounts: [${adminRows.map(a => a.email).join(', ')}]`
     );
 
   } finally {

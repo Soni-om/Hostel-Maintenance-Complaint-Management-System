@@ -150,12 +150,18 @@ Base URL: `http://localhost:5000/api/v1`
 - **Access:** `Admin`
 - **Success:** `200 OK` $\rightarrow$ `{ success: true, users: [...], pagination }`
 
-### 5.2 Create Staff / Admin User
+### 5.2 Create Staff User (Controlled Provisioning)
 - **Method:** `POST`
-- **Endpoint:** `/users`
-- **Access:** `Admin`
-- **Body:** `{ name, email, password, role ('staff'|'admin'), phone, staff_designation }`
-- **Success:** `201 Created` $\rightarrow$ `{ success: true, user }`
+- **Endpoint:** `/users` (also `/api/v1/users`)
+- **Access:** `Admin` only
+- **Policy:** Strictly allows creation of `staff` accounts only. Administrator accounts are strictly system-seeded and cannot be created via the API. Any attempt to provision `role: 'admin'`, `role: 'student'`, or arbitrary roles returns `400 Bad Request`.
+- **Body:** `{ name, email, password, role: 'staff', phone, staff_designation, hostel_block }`
+- **Success:** `201 Created` $\rightarrow$ `{ success: true, message: 'Staff account provisioned successfully.', user: { id, name, email, role: 'staff', ... } }`
+- **Errors:**
+  - `400 Bad Request`: Validation failure or attempt to provision unauthorized role (`admin`, `student`, arbitrary).
+  - `401 Unauthorized`: Missing or invalid Admin JWT.
+  - `403 Forbidden`: Authenticated user is not an Admin.
+  - `409 Conflict`: Email already registered.
 
 ### 5.3 Toggle User Status (Activate/Deactivate)
 - **Method:** `PATCH`

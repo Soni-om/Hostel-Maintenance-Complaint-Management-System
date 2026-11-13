@@ -328,7 +328,7 @@ async function runSession8Audit() {
       `HTTP ${a18.status}, message: "${a18.data?.message}"`
     );
 
-    // 4.6: Admin provisions delegated secondary Administrator account (HTTP 201)
+    // 4.6: Admin attempts to provision Admin account -> Strictly rejected (HTTP 400 Bad Request)
     const a19 = await requestJson(baseUrl, '/api/v1/users', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${adminToken}` },
@@ -340,10 +340,9 @@ async function runSession8Audit() {
         phone: '+91 9811445566'
       }
     });
-    const provAdmin = a19.data?.user;
-    recordAudit('Provisioning', 19, 'Admin provisions delegated Administrator account (HTTP 201)',
-      a19.status === 201 && provAdmin?.role === 'admin' && provAdmin?.email === tempAdminEmail,
-      `HTTP ${a19.status}, id: ${provAdmin?.id}, role: "${provAdmin?.role}"`
+    recordAudit('Provisioning', 19, 'Admin provisioning of Admin role is strictly rejected with HTTP 400 (system-seeded)',
+      a19.status === 400 && (a19.data?.message?.includes('system-seeded') || a19.data?.errors?.[0]?.msg?.includes('system-seeded')),
+      `HTTP ${a19.status}, message: "${a19.data?.message || a19.data?.errors?.[0]?.msg}"`
     );
 
     // 4.7: Invalid role manipulation rejected (e.g. role: 'student' or 'superadmin')
@@ -420,7 +419,9 @@ async function runSession8Audit() {
     );
 
     // Clean up temporary test users created during audit
-    await pool.query('DELETE FROM users WHERE id IN (?, ?)', [provStaff.id, provAdmin.id]);
+    if (provStaff?.id) {
+      await pool.query('DELETE FROM users WHERE id = ?', [provStaff.id]);
+    }
 
     // ========================================================================
     // SECTION 6: Frontend Role Guards & Navigation Architecture
@@ -508,6 +509,14 @@ async function runSession8Audit() {
     recordAudit('Database', 32, 'MySQL database retains exactly 8 pristine seed records (Zero test pollution)',
       remainingUsers === 8,
       `Total users remaining in DB: ${remainingUsers} (1 Admin, 3 Staff, 4 Students)`
+    );
+
+    // 7.6: Database Admin Account Audit
+    const [adminRows] = await pool.query('SELECT id, name, email, role FROM users WHERE role = ?', ['admin']);
+    const onlySeededAdmin = adminRows.length === 1 && adminRows[0].email === 'admin@hostelcare.edu';
+    recordAudit('Database', 33, 'Database Security: Exactly 1 seeded Admin account exists (no unauthorized Admin accounts)',
+      onlySeededAdmin,
+      `Admin count: ${adminRows.length}, accounts: [${adminRows.map(a => a.email).join(', ')}]`
     );
 
   } finally {

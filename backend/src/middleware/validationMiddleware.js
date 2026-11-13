@@ -155,8 +155,11 @@ export const validateUserProvisioningRules = [
     .notEmpty().withMessage('Role is required.')
     .custom((val) => {
       const normalized = val.toLowerCase();
-      if (!['staff', 'admin'].includes(normalized)) {
-        throw new Error("Invalid provisioning role. Only 'staff' and 'admin' roles can be provisioned via this endpoint.");
+      if (normalized === 'admin') {
+        throw new Error("Policy Denied: Administrator accounts are strictly system-seeded and cannot be created via the API.");
+      }
+      if (normalized !== 'staff') {
+        throw new Error(`Invalid provisioning role '${val}'. Only 'staff' accounts can be provisioned via this endpoint.`);
       }
       return true;
     }),

@@ -11,9 +11,10 @@ const BCRYPT_SALT_ROUNDS = 10;
 
 const UserController = {
   /**
-   * Controlled Staff & Admin Account Provisioning
+   * Controlled Staff Account Provisioning
    * POST /api/users or /api/v1/users
    * Access: Admin only
+   * Policy: Staff accounts only (Admin accounts are strictly system-seeded)
    */
   async provisionUser(req, res) {
     try {
@@ -27,10 +28,25 @@ const UserController = {
         hostel_block
       } = req.body;
 
-      // 1. Normalize email
+      // 1. Enforce strict Master Role Table policy: Staff accounts only (Admin is system-seeded)
+      const requestedRole = (role || '').toLowerCase().trim();
+      if (requestedRole === 'admin') {
+        return res.status(400).json({
+          success: false,
+          message: 'Policy Denied: Administrator accounts are strictly system-seeded and cannot be created via the API.'
+        });
+      }
+      if (requestedRole !== 'staff') {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid provisioning role '${role}'. Only 'staff' accounts can be provisioned via this endpoint.`
+        });
+      }
+
+      // 2. Normalize email
       const normalizedEmail = email.trim().toLowerCase();
 
-      // 2. Check for duplicate email
+      // 3. Check for duplicate email
       const existingUser = await UserModel.findByEmail(normalizedEmail);
       if (existingUser) {
         return res.status(409).json({
@@ -39,10 +55,10 @@ const UserController = {
         });
       }
 
-      // 3. Hash password using bcryptjs (10 rounds)
+      // 4. Hash password using bcryptjs (10 rounds)
       const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
-      // 4. Resolve block_id if hostel_block name is provided
+      // 5. Resolve block_id if hostel_block name is provided
       let blockId = null;
       if (hostel_block) {
         const matchedBlock = await UserModel.findBlock(hostel_block);
@@ -51,23 +67,23 @@ const UserController = {
         }
       }
 
-      // 5. Persist user with specified administrative role
+      // 6. Persist staff user record
       const newUser = await UserModel.createUser({
         name,
         email: normalizedEmail,
         passwordHash,
         phone,
-        role: role.toLowerCase().trim(),
+        role: 'staff',
         accountStatus: 'active',
         blockId,
         hostelBlock: hostel_block,
-        staffDesignation: role.toLowerCase() === 'staff' ? staff_designation : null
+        staffDesignation: staff_designation ? staff_designation.trim() : null
       });
 
-      // 6. Return safe user data without password_hash
+      // 7. Return safe user data without password_hash
       return res.status(201).json({
         success: true,
-        message: `${role.charAt(0).toUpperCase() + role.slice(1)} account provisioned successfully.`,
+        message: 'Staff account provisioned successfully.',
         user: {
           id: newUser.id,
           name: newUser.name,

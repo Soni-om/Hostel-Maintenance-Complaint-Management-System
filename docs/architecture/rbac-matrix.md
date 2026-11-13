@@ -32,7 +32,7 @@
 | **Complaints: Feedback** | `POST /api/v1/complaints/:id/feedback` | ✅ | ❌ | ❌ | Student owner only, once complaint is `Resolved`. |
 | **Categories: List** | `GET /api/v1/categories` | ✅ | ✅ | ✅ | Publicly visible to all authenticated roles. |
 | **Categories: Manage** | `POST/PUT/DELETE /api/v1/categories` | ❌ | ❌ | ✅ | Admin only. |
-| **Users: Provision Staff/Admin** | `POST /api/v1/users` | ❌ | ❌ | ✅ | Admin only. Controlled account creation. |
+| **Users: Provision Staff** | `POST /api/v1/users` | ❌ | ❌ | ✅ | Admin only. Controlled `staff` account creation only. Admin creation via API is strictly rejected (400 Bad Request) as Admin accounts are system-seeded. |
 | **Users: List Directory** | `GET /api/v1/users` | ❌ | ❌ | ✅ | Admin only. Paginated with role/status filters. |
 | **Users: Toggle Status** | `PATCH /api/v1/users/:id/status` | ❌ | ❌ | ✅ | Admin only. Cannot self-deactivate. |
 | **Staff: Operations Overview** | `GET /api/v1/staff/overview` | ❌ | ✅ | ✅ | Staff & Admin only. Maintenance queue overview. |
@@ -48,7 +48,7 @@
 | `POST` | `/api/v1/auth/login` | None (Public) | All Roles | Account must be `active`. bcrypt verification. Generic 401 error. | `200`, `400`, `401`, `403` |
 | `GET` | `/api/v1/auth/me` | Bearer JWT | `student`, `staff`, `admin` | Live DB check (`findById`). Excludes `password_hash`. Account must be `active`. | `200`, `401`, `403` |
 | `POST` | `/api/v1/auth/logout` | Optional Bearer | All Roles | Client-side token discard acknowledgment. | `200` |
-| `POST` | `/api/v1/users` | Bearer JWT | `admin` | Admin can provision `staff` and delegated `admin` accounts. BCrypt 10 rounds. | `201`, `400`, `401`, `403`, `409` |
+| `POST` | `/api/v1/users` | Bearer JWT | `admin` | Admin can provision `staff` accounts only. Admin accounts are system-seeded; `role: 'admin'` rejected with 400 Bad Request. Bcrypt 10 rounds. | `201`, `400`, `401`, `403`, `409` |
 | `GET` | `/api/v1/users` | Bearer JWT | `admin` | Returns user directory. Never leaks `password_hash`. Paginated. | `200`, `401`, `403` |
 | `PATCH` | `/api/v1/users/:id/status` | Bearer JWT | `admin` | Cannot deactivate own admin account. | `200`, `400`, `401`, `403`, `404` |
 | `GET` | `/api/v1/staff/overview` | Bearer JWT | `staff`, `admin` | Maintenance staff dashboard metrics. Students forbidden (403). | `200`, `401`, `403` |

@@ -16,7 +16,7 @@ router.use(requireAuth);
 
 /**
  * @route   POST /api/users or /api/v1/users
- * @desc    Controlled Staff & Admin Account Provisioning
+ * @desc    Controlled Staff Account Provisioning (Admin accounts are system-seeded)
  * @access  Admin only
  */
 router.post('/', requireRole('admin'), validateUserProvisioningRules, UserController.provisionUser);
