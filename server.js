@@ -15,7 +15,13 @@ const server = http.createServer(app);
 
 // Start server and validate database connectivity
 async function startServer() {
-  // 1. Validate Database Pool Connectivity
+  // 1. Validate JWT Security Configuration
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim().length < 32) {
+    console.error('FATAL: JWT_SECRET environment variable is missing or insecure (minimum 32 characters required).');
+    process.exit(1);
+  }
+
+  // 2. Validate Database Pool Connectivity
   console.log('Testing MySQL database pool connection...');
   const dbHealth = await testConnection();
 
@@ -26,7 +32,7 @@ async function startServer() {
     console.warn('  The server will continue running; check your DB_HOST, DB_USER, and DB_PASSWORD in .env.');
   }
 
-  // 2. Start HTTP Server
+  // 3. Start HTTP Server
   server.listen(PORT, HOST, () => {
     console.log('====================================================');
     console.log(`  HOSTELCARE — HOSTEL MAINTENANCE SYSTEM READY      `);

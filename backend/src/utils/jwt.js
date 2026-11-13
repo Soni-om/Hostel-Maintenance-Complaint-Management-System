@@ -10,12 +10,8 @@ import jwt from 'jsonwebtoken';
  */
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('FATAL: JWT_SECRET environment variable is missing in production.');
-    }
-    // Fallback for isolated development / tests
-    return 'hostelcare_dev_fallback_secret_key_minimum_32_characters_long';
+  if (!secret || secret.trim().length < 32) {
+    throw new Error('FATAL: JWT_SECRET environment variable is missing or insecure (minimum 32 characters required).');
   }
   return secret;
 }
@@ -50,3 +46,4 @@ export default {
   generateToken,
   verifyToken
 };
+
