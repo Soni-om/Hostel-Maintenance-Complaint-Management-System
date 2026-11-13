@@ -160,6 +160,59 @@ const AuthController = {
         message: 'An unexpected internal error occurred during login. Please try again.'
       });
     }
+  },
+
+  /**
+   * Current Authenticated User Profile
+   * GET /api/auth/me or /api/v1/auth/me
+   */
+  async getMe(req, res) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required.'
+        });
+      }
+
+      // Safe user data is already attached by requireAuth (via UserModel.findById, excluding password_hash)
+      return res.status(200).json({
+        success: true,
+        user: req.user
+      });
+    } catch (error) {
+      console.error('Get Profile Controller Error:', error.message);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while retrieving user profile.'
+      });
+    }
+  },
+
+  /**
+   * User Logout & Session Invalidation Acknowledgment
+   * POST /api/auth/logout or /api/v1/auth/logout
+   *
+   * Architectural Distinction Note:
+   * In a stateless JWT architecture, tokens are self-contained and cryptographically signed.
+   * True instantaneous token revocation without a centralized state store (e.g., Redis blocklist)
+   * is handled via client-side discard (purging token & user from localStorage via Api.clearAuth()).
+   * Immediate server-side termination of compromised, inactive, or suspended accounts is
+   * enforced on every protected request by requireAuth through live MySQL UserModel.findById() checks.
+   */
+  async logout(req, res) {
+    try {
+      return res.status(200).json({
+        success: true,
+        message: 'Logged out successfully. Client session tokens have been cleared.'
+      });
+    } catch (error) {
+      console.error('Logout Controller Error:', error.message);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected error occurred during logout.'
+      });
+    }
   }
 };
 

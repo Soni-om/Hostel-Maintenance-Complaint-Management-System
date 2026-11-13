@@ -21,8 +21,9 @@
           <span id="admin-dot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-light);"></span>
           <span id="admin-status-label">Checking API...</span>
         </div>
+        <span id="user-display-name" style="font-size: var(--font-sm); font-weight: 600; color: var(--color-text-main);">Administrator</span>
         <a href="/" class="btn btn-secondary btn-sm">Home</a>
-        <a href="/pages/auth/login.html" onclick="if(window.Api){window.Api.clearAuth();}" class="btn btn-primary btn-sm">Log Out</a>
+        <a href="/pages/auth/login.html" data-action="logout" onclick="if(window.Auth){event.preventDefault();window.Auth.logout();}else if(window.Api){window.Api.clearAuth();}" class="btn btn-primary btn-sm btn-logout">Log Out</a>
       </div>
     </div>
   </header>
@@ -91,7 +92,13 @@
   <script src="/js/config.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/utils.js"></script>
+  <script src="/js/auth.js"></script>
   <script>
+    // Enforce admin role access control and background profile verification
+    if (window.Auth) {
+      window.Auth.requireAuth(['admin']);
+    }
+
     async function checkStatus() {
       const dot = document.getElementById('admin-dot');
       const label = document.getElementById('admin-status-label');
