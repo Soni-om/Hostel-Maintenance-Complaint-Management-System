@@ -13,7 +13,7 @@ const AuthController = {
    * Student Self-Registration
    * POST /api/auth/register or /api/v1/auth/register
    */
-  async register(req, res, next) {
+  async register(req, res) {
     try {
       const { name, email, password, phone, hostel_block, room_number } = req.body;
 
@@ -29,7 +29,7 @@ const AuthController = {
         });
       }
 
-      // 3. Hash plain password using bcryptjs
+      // 3. Hash plain password using bcryptjs (Salt rounds: 10)
       const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
       // 4. Resolve block_id if hostel_block name is provided
@@ -52,7 +52,7 @@ const AuthController = {
         roomNumber: room_number
       });
 
-      // 6. Return safe user data without password_hash
+      // 6. Return safe user data without password_hash or credentials
       return res.status(201).json({
         success: true,
         message: 'Student account registered successfully. You may now sign in.',
@@ -77,7 +77,13 @@ const AuthController = {
           message: 'An account with this email address is already registered.'
         });
       }
-      return next(error);
+
+      // Internal error logging — Never expose internal SQL, credentials or stack traces to client
+      console.error('Registration Controller Error:', error.message);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while processing registration. Please try again.'
+      });
     }
   }
 };

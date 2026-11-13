@@ -17,3 +17,4 @@ const router = Router();
 router.post('/register', validateRegistrationRules, AuthController.register);
 
 export default router;
+
