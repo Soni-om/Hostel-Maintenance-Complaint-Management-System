@@ -188,6 +188,20 @@ app.use((err, req, res, next) => {
         message: 'Unexpected file field or too many files. Only a single photo is permitted.'
       });
     }
+    if (err.code === 'LIMIT_PART_COUNT') {
+      return res.status(400).json({
+        success: false,
+        code: 'LIMIT_PART_COUNT',
+        message: 'Too many parts in multipart request. Maximum 25 parts permitted.'
+      });
+    }
+    if (err.code === 'LIMIT_FIELD_COUNT') {
+      return res.status(400).json({
+        success: false,
+        code: 'LIMIT_FIELD_COUNT',
+        message: 'Too many form fields in multipart request. Maximum 20 fields permitted.'
+      });
+    }
     return res.status(400).json({
       success: false,
       code: err.code,

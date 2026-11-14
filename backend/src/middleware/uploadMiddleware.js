@@ -34,7 +34,8 @@ const upload = multer({
     fileSize: MAX_FILE_SIZE,
     files: 1, // Only one photo accepted per request
     fields: 20,
-    fieldSize: 1024 * 1024
+    fieldSize: 1024 * 1024,
+    parts: 25 // Explicit multipart parts limit (SEC-11-LOW-01)
   },
   fileFilter
 });

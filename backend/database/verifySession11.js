@@ -128,6 +128,32 @@ async function runSession11Verification() {
       create: { width: 50, height: 50, channels: 3, background: { r: 0, g: 0, b: 255 } }
     }).webp().toBuffer();
 
+    // Helper: generate a 100% valid, genuinely decodable JPEG image of an exact byte count
+    // Uses conformant ITU-T T.81 COM (comment) marker segments so image remains structurally valid
+    async function createExactSizeValidJpeg(targetBytes) {
+      const baseJpeg = await sharp({
+        create: { width: 10, height: 10, channels: 3, background: { r: 255, g: 0, b: 0 } }
+      }).jpeg().toBuffer();
+
+      let neededPadding = targetBytes - baseJpeg.length;
+      const comChunks = [];
+      while (neededPadding > 0) {
+        const maxChunkData = 60000;
+        const dataLen = Math.min(maxChunkData, neededPadding - 4);
+        const markerLen = dataLen + 2;
+        const header = Buffer.from([0xFF, 0xFE, (markerLen >> 8) & 0xFF, markerLen & 0xFF]);
+        const data = Buffer.alloc(dataLen, 0x41); // 'A'
+        comChunks.push(header, data);
+        neededPadding -= (dataLen + 4);
+      }
+
+      return Buffer.concat([
+        baseJpeg.subarray(0, 2),
+        ...comChunks,
+        baseJpeg.subarray(2)
+      ]);
+    }
+
     // ========================================================================
     // PART 1: COMPLAINT CREATION & OPTIONAL PHOTO UPLOAD
     // ========================================================================
@@ -304,14 +330,13 @@ async function runSession11Verification() {
     recordTest(8, 'Corrupted image bytes rejected with HTTP 415 via Sharp decoding validation', t8Pass,
       `HTTP ${res8.status}, code: ${data8?.code}, message: "${data8?.message}"`);
 
-    // Test 9: Oversized file (> 5MB) rejected with HTTP 413 (FILE_TOO_LARGE)
+    // Test 9: Exact 5MB Boundary — Valid decodable JPEG of exactly 5,242,880 bytes succeeds (HTTP 201 Created)
+    const exact5MbJpeg = await createExactSizeValidJpeg(5 * 1024 * 1024);
     const form9 = new FormData();
-    form9.append('title', 'Electrical spark near switchboard');
-    form9.append('description', 'Sparking observed behind the modular wall switchplate.');
+    form9.append('title', 'Water cooler compressor burnt out');
+    form9.append('description', 'Cooler unit tripping main circuit breaker on 2nd floor corridor.');
     form9.append('category_id', '1');
-    // Buffer size: 5MB + 1024 bytes = 5,243,904 bytes
-    const oversizedBuf = Buffer.alloc(5 * 1024 * 1024 + 1024, 0);
-    form9.append('photo', new Blob([oversizedBuf], { type: 'image/jpeg' }), 'giant.jpg');
+    form9.append('photo', new Blob([exact5MbJpeg], { type: 'image/jpeg' }), 'boundary_exact5mb.jpg');
 
     const res9 = await fetch(`${baseUrl}/api/v1/complaints`, {
       method: 'POST',
@@ -319,17 +344,23 @@ async function runSession11Verification() {
       body: form9
     });
     const data9 = await res9.json();
-    const t9Pass = res9.status === 413 && data9?.code === 'FILE_TOO_LARGE';
-    recordTest(9, 'Oversized file (> 5MB) rejected with HTTP 413 FILE_TOO_LARGE', t9Pass,
-      `HTTP ${res9.status}, code: ${data9?.code}, message: "${data9?.message}"`);
+    if (data9?.complaint?.id) createdComplaintIds.push(data9.complaint.id);
 
-    // Test 10: Multiple files rejected with HTTP 400 (UNEXPECTED_FILE)
+    const att9 = data9?.complaint?.attachment;
+    const t9Pass = res9.status === 201 &&
+                   data9?.success === true &&
+                   att9?.id > 0 &&
+                   att9?.mime_type === 'image/jpeg';
+    recordTest(9, 'File Size Boundary: Valid image of exactly 5,242,880 bytes (5MB) succeeds (HTTP 201 Created)', t9Pass,
+      `HTTP ${res9.status}, att ID: ${att9?.id}, size: ${att9?.size_bytes} bytes, download: ${att9?.download_url}`);
+
+    // Test 10: 5MB + 1 Byte Boundary — Valid decodable JPEG of exactly 5,242,881 bytes rejected with HTTP 413 (FILE_TOO_LARGE)
+    const oversized5MbJpeg = await createExactSizeValidJpeg(5 * 1024 * 1024 + 1);
     const form10 = new FormData();
     form10.append('title', 'Electrical spark near switchboard');
     form10.append('description', 'Sparking observed behind the modular wall switchplate.');
     form10.append('category_id', '1');
-    form10.append('photo', new Blob([validJpegBuffer], { type: 'image/jpeg' }), 'photo1.jpg');
-    form10.append('extra_photo', new Blob([validPngBuffer], { type: 'image/png' }), 'photo2.png');
+    form10.append('photo', new Blob([oversized5MbJpeg], { type: 'image/jpeg' }), 'oversized_5mb_plus_1.jpg');
 
     const res10 = await fetch(`${baseUrl}/api/v1/complaints`, {
       method: 'POST',
@@ -337,160 +368,208 @@ async function runSession11Verification() {
       body: form10
     });
     const data10 = await res10.json();
-    const t10Pass = res10.status === 400 && data10?.code === 'UNEXPECTED_FILE';
-    recordTest(10, 'Unexpected/multiple file fields rejected with HTTP 400 UNEXPECTED_FILE', t10Pass,
+    const t10Pass = res10.status === 413 && data10?.code === 'FILE_TOO_LARGE';
+    recordTest(10, 'File Size Boundary: Valid image of exactly 5,242,881 bytes (5MB + 1B) rejected with HTTP 413 FILE_TOO_LARGE', t10Pass,
       `HTTP ${res10.status}, code: ${data10?.code}, message: "${data10?.message}"`);
+
+    // Test 11: Explicit multipart parts limit (SEC-11-LOW-01) — Request exceeding 25 parts rejected with HTTP 400 LIMIT_PART_COUNT
+    const form11 = new FormData();
+    form11.append('title', 'Door hinge loose and rattling');
+    form11.append('description', 'The top hinge screws are completely stripped out.');
+    form11.append('category_id', '5');
+    // Add 24 additional dummy text fields to total 27 parts (> 25 parts limit)
+    for (let p = 1; p <= 24; p++) {
+      form11.append(`dummy_field_${p}`, `part_${p}`);
+    }
+
+    const res11 = await fetch(`${baseUrl}/api/v1/complaints`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${student1Token}` },
+      body: form11
+    });
+    const data11 = await res11.json();
+    const t11Pass = res11.status === 400 && (data11?.code === 'LIMIT_PART_COUNT' || data11?.code === 'LIMIT_FIELD_COUNT');
+    recordTest(11, 'Explicit Parts & Fields Limit: Multipart request exceeding limits rejected with HTTP 400', t11Pass,
+      `HTTP ${res11.status}, code: ${data11?.code}, message: "${data11?.message}"`);
+
+    // Test 12: Multiple files rejected with HTTP 400 (UNEXPECTED_FILE)
+    const form12 = new FormData();
+    form12.append('title', 'Electrical spark near switchboard');
+    form12.append('description', 'Sparking observed behind the modular wall switchplate.');
+    form12.append('category_id', '1');
+    form12.append('photo', new Blob([validJpegBuffer], { type: 'image/jpeg' }), 'photo1.jpg');
+    form12.append('extra_photo', new Blob([validPngBuffer], { type: 'image/png' }), 'photo2.png');
+
+    const res12 = await fetch(`${baseUrl}/api/v1/complaints`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${student1Token}` },
+      body: form12
+    });
+    const data12 = await res12.json();
+    const t12Pass = res12.status === 400 && data12?.code === 'UNEXPECTED_FILE';
+    recordTest(12, 'Unexpected/multiple file fields rejected with HTTP 400 UNEXPECTED_FILE', t12Pass,
+      `HTTP ${res12.status}, code: ${data12?.code}, message: "${data12?.message}"`);
 
     // ========================================================================
     // PART 3: AUTHENTICATION & ROLE GUARDS (PRE-MULTER REJECTION)
     // ========================================================================
     console.log('\n--- PART 3: Authentication & Role Authorization Enforcement ---');
 
-    // Test 11: Unauthenticated multipart upload rejected with HTTP 401 NO_TOKEN
-    const form11 = new FormData();
-    form11.append('title', 'Electrical spark near switchboard');
-    form11.append('description', 'Sparking observed behind the modular wall switchplate.');
-    form11.append('category_id', '1');
-    form11.append('photo', new Blob([validJpegBuffer], { type: 'image/jpeg' }), 'photo.jpg');
+    // Test 13: Unauthenticated multipart upload rejected with HTTP 401 NO_TOKEN
+    const form13 = new FormData();
+    form13.append('title', 'Electrical spark near switchboard');
+    form13.append('description', 'Sparking observed behind the modular wall switchplate.');
+    form13.append('category_id', '1');
+    form13.append('photo', new Blob([validJpegBuffer], { type: 'image/jpeg' }), 'photo.jpg');
 
-    const res11 = await fetch(`${baseUrl}/api/v1/complaints`, {
+    const res13 = await fetch(`${baseUrl}/api/v1/complaints`, {
       method: 'POST',
-      body: form11
+      body: form13
     });
-    const data11 = await res11.json();
-    const t11Pass = res11.status === 401 && data11?.code === 'NO_TOKEN';
-    recordTest(11, 'Unauthenticated upload rejected with HTTP 401 NO_TOKEN', t11Pass,
-      `HTTP ${res11.status}, code: ${data11?.code}`);
+    const data13 = await res13.json();
+    const t13Pass = res13.status === 401 && data13?.code === 'NO_TOKEN';
+    recordTest(13, 'Unauthenticated upload rejected with HTTP 401 NO_TOKEN', t13Pass,
+      `HTTP ${res13.status}, code: ${data13?.code}`);
 
-    // Test 12: Staff token attempting complaint upload rejected with HTTP 403 FORBIDDEN_ROLE
-    const form12 = new FormData();
-    form12.append('title', 'Electrical spark near switchboard');
-    form12.append('description', 'Sparking observed behind the modular wall switchplate.');
-    form12.append('category_id', '1');
-    form12.append('photo', new Blob([validJpegBuffer], { type: 'image/jpeg' }), 'photo.jpg');
+    // Test 14: Staff token attempting complaint upload rejected with HTTP 403 FORBIDDEN_ROLE
+    const form14 = new FormData();
+    form14.append('title', 'Electrical spark near switchboard');
+    form14.append('description', 'Sparking observed behind the modular wall switchplate.');
+    form14.append('category_id', '1');
+    form14.append('photo', new Blob([validJpegBuffer], { type: 'image/jpeg' }), 'photo.jpg');
 
-    const res12 = await fetch(`${baseUrl}/api/v1/complaints`, {
+    const res14 = await fetch(`${baseUrl}/api/v1/complaints`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${staffToken}` },
-      body: form12
+      body: form14
     });
-    const data12 = await res12.json();
-    const t12Pass = res12.status === 403 && data12?.code === 'FORBIDDEN_ROLE';
-    recordTest(12, 'Staff token rejected from lodging complaint with HTTP 403 FORBIDDEN_ROLE', t12Pass,
-      `HTTP ${res12.status}, code: ${data12?.code}`);
+    const data14 = await res14.json();
+    const t14Pass = res14.status === 403 && data14?.code === 'FORBIDDEN_ROLE';
+    recordTest(14, 'Staff token rejected from lodging complaint with HTTP 403 FORBIDDEN_ROLE', t14Pass,
+      `HTTP ${res14.status}, code: ${data14?.code}`);
 
     // ========================================================================
     // PART 4: PRIVATE ATTACHMENT ACCESS & DOWNLOAD SECURITY
     // ========================================================================
     console.log('\n--- PART 4: Private Attachment Access & Security Headers ---');
 
-    // Test 13: Student 1 downloads owned attachment stream successfully (HTTP 200)
+    // Test 15: Student 1 downloads owned attachment stream successfully (HTTP 200)
     const downloadUrl = `/api/v1/complaints/${data2.complaint.id}/attachments/${att2.id}`;
-    const res13 = await fetch(`${baseUrl}${downloadUrl}`, {
+    const res15 = await fetch(`${baseUrl}${downloadUrl}`, {
       headers: { 'Authorization': `Bearer ${student1Token}` }
     });
-    const buf13 = Buffer.from(await res13.arrayBuffer());
-    const t13Pass = res13.status === 200 &&
-                    res13.headers.get('content-type') === 'image/jpeg' &&
-                    res13.headers.get('x-content-type-options') === 'nosniff' &&
-                    res13.headers.get('cache-control')?.includes('private') &&
-                    buf13.length > 0;
-    recordTest(13, 'Student 1 retrieves owned attachment stream with secure headers', t13Pass,
-      `HTTP ${res13.status}, bytes: ${buf13.length}, content-type: ${res13.headers.get('content-type')}, nosniff: ${res13.headers.get('x-content-type-options')}`);
+    const buf15 = Buffer.from(await res15.arrayBuffer());
+    const t15Pass = res15.status === 200 &&
+                    res15.headers.get('content-type') === 'image/jpeg' &&
+                    res15.headers.get('x-content-type-options') === 'nosniff' &&
+                    res15.headers.get('cache-control')?.includes('private') &&
+                    buf15.length > 0;
+    recordTest(15, 'Student 1 retrieves owned attachment stream with secure headers', t15Pass,
+      `HTTP ${res15.status}, bytes: ${buf15.length}, content-type: ${res15.headers.get('content-type')}, nosniff: ${res15.headers.get('x-content-type-options')}`);
 
-    // Test 14: Cross-Student IDOR Defense — Student 2 cannot access Student 1's attachment (HTTP 404)
-    const res14 = await fetch(`${baseUrl}${downloadUrl}`, {
+    // Test 16: Cross-Student IDOR Defense — Student 2 cannot access Student 1's attachment (HTTP 404)
+    const res16 = await fetch(`${baseUrl}${downloadUrl}`, {
       headers: { 'Authorization': `Bearer ${student2Token}` }
     });
-    const data14 = await res14.json();
-    const t14Pass = res14.status === 404 && data14?.message === 'Attachment not found.';
-    recordTest(14, 'Cross-Student IDOR Defense: Student 2 receives HTTP 404 on Student 1 attachment', t14Pass,
-      `HTTP ${res14.status}, message: "${data14?.message}"`);
+    const data16 = await res16.json();
+    const t16Pass = res16.status === 404 && data16?.message === 'Attachment not found.';
+    recordTest(16, 'Cross-Student IDOR Defense: Student 2 receives HTTP 404 on Student 1 attachment', t16Pass,
+      `HTTP ${res16.status}, message: "${data16?.message}"`);
 
-    // Test 15: Authorized Staff member can view/download ticket attachment
-    const res15 = await fetch(`${baseUrl}${downloadUrl}`, {
+    // Test 17: Staff Attachment Access Restricted (SEC-11-MED-01 Remediation)
+    // Staff denied attachment download with HTTP 403 FORBIDDEN_ROLE pending Phase 3 assignment & domain scoping
+    const res17 = await fetch(`${baseUrl}${downloadUrl}`, {
       headers: { 'Authorization': `Bearer ${staffToken}` }
     });
-    const buf15 = Buffer.from(await res15.arrayBuffer());
-    const t15Pass = res15.status === 200 && buf15.length > 0;
-    recordTest(15, 'Staff member authorized to inspect ticket attachment stream', t15Pass,
-      `HTTP ${res15.status}, streamed bytes: ${buf15.length}`);
+    const data17 = await res17.json();
+    const t17Pass = res17.status === 403 &&
+                    data17?.code === 'FORBIDDEN_ROLE' &&
+                    data17?.message.includes('Staff attachment downloads are temporarily restricted');
+    recordTest(17, 'Staff Attachment Download Restriction: Staff receives HTTP 403 FORBIDDEN_ROLE (SEC-11-MED-01)', t17Pass,
+      `HTTP ${res17.status}, code: ${data17?.code}, message: "${data17?.message}"`);
 
-    // Test 16: Authorized Admin can view/download ticket attachment
-    const res16 = await fetch(`${baseUrl}${downloadUrl}`, {
+    // Test 18: Authorized Admin can view/download ticket attachment (HTTP 200)
+    const res18 = await fetch(`${baseUrl}${downloadUrl}`, {
       headers: { 'Authorization': `Bearer ${adminToken}` }
     });
-    const buf16 = Buffer.from(await res16.arrayBuffer());
-    const t16Pass = res16.status === 200 && buf16.length > 0;
-    recordTest(16, 'Admin authorized to inspect ticket attachment stream', t16Pass,
-      `HTTP ${res16.status}, streamed bytes: ${buf16.length}`);
+    const buf18 = Buffer.from(await res18.arrayBuffer());
+    const t18Pass = res18.status === 200 && buf18.length > 0;
+    recordTest(18, 'Admin authorized to inspect ticket attachment stream (HTTP 200 OK)', t18Pass,
+      `HTTP ${res18.status}, streamed bytes: ${buf18.length}`);
 
-    // Test 17: Direct public access to /uploads is blocked with HTTP 403
-    const res17 = await fetch(`${baseUrl}/uploads/complaints/test.jpg`);
-    const data17 = await res17.json();
-    const t17Pass = res17.status === 403 && data17?.success === false;
-    recordTest(17, 'Direct public access to /uploads strictly blocked with HTTP 403', t17Pass,
-      `HTTP ${res17.status}, message: "${data17?.message}"`);
+    // Test 19: Unauthenticated attachment download rejected with HTTP 401 NO_TOKEN
+    const res19 = await fetch(`${baseUrl}${downloadUrl}`);
+    const data19 = await res19.json();
+    const t19Pass = res19.status === 401 && data19?.code === 'NO_TOKEN';
+    recordTest(19, 'Unauthenticated attachment download rejected with HTTP 401 NO_TOKEN', t19Pass,
+      `HTTP ${res19.status}, code: ${data19?.code}`);
+
+    // Test 20: Direct public access to /uploads is blocked with HTTP 403
+    const res20 = await fetch(`${baseUrl}/uploads/complaints/test.jpg`);
+    const data20 = await res20.json();
+    const t20Pass = res20.status === 403 && data20?.success === false;
+    recordTest(20, 'Direct public access to /uploads strictly blocked with HTTP 403', t20Pass,
+      `HTTP ${res20.status}, message: "${data20?.message}"`);
 
     // ========================================================================
     // PART 5: TRANSACTION SAFETY, ORPHAN CLEANUP & ROBUSTNESS
     // ========================================================================
     console.log('\n--- PART 5: Transaction Safety, Orphan Cleanup & Path Protection ---');
 
-    // Test 18: Validation failure before write leaves zero orphaned files
-    const filesBefore18 = fs.readdirSync(COMPLAINTS_UPLOAD_DIR).filter((f) => f !== '.gitkeep');
-    const form18 = new FormData();
-    form18.append('title', 'Bad'); // Too short (< 5 chars)
-    form18.append('description', 'Valid description long enough for schema validation.');
-    form18.append('category_id', '1');
-    form18.append('photo', new Blob([validJpegBuffer], { type: 'image/jpeg' }), 'will_fail.jpg');
+    // Test 21: Validation failure before write leaves zero orphaned files
+    const filesBefore21 = fs.readdirSync(COMPLAINTS_UPLOAD_DIR).filter((f) => f !== '.gitkeep');
+    const form21 = new FormData();
+    form21.append('title', 'Bad'); // Too short (< 5 chars)
+    form21.append('description', 'Valid description long enough for schema validation.');
+    form21.append('category_id', '1');
+    form21.append('photo', new Blob([validJpegBuffer], { type: 'image/jpeg' }), 'will_fail.jpg');
 
-    const res18 = await fetch(`${baseUrl}/api/v1/complaints`, {
+    const res21 = await fetch(`${baseUrl}/api/v1/complaints`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${student1Token}` },
-      body: form18
+      body: form21
     });
-    const data18 = await res18.json();
-    const filesAfter18 = fs.readdirSync(COMPLAINTS_UPLOAD_DIR).filter((f) => f !== '.gitkeep');
-    const t18Pass = res18.status === 400 &&
-                    filesAfter18.length === filesBefore18.length;
-    recordTest(18, 'Validation failure leaves zero orphaned files on disk', t18Pass,
-      `HTTP ${res18.status}, files before: ${filesBefore18.length}, files after: ${filesAfter18.length}`);
+    const data21 = await res21.json();
+    const filesAfter21 = fs.readdirSync(COMPLAINTS_UPLOAD_DIR).filter((f) => f !== '.gitkeep');
+    const t21Pass = res21.status === 400 &&
+                    filesAfter21.length === filesBefore21.length;
+    recordTest(21, 'Validation failure leaves zero orphaned files on disk', t21Pass,
+      `HTTP ${res21.status}, files before: ${filesBefore21.length}, files after: ${filesAfter21.length}`);
 
-    // Test 19: Missing physical attachment file handled cleanly with HTTP 404
+    // Test 22: Missing physical attachment file handled cleanly with HTTP 404
     // We query seed attachment 1 (whose seed file is a mock path not physically present)
-    const res19 = await fetch(`${baseUrl}/api/v1/complaints/1/attachments/1`, {
+    const res22 = await fetch(`${baseUrl}/api/v1/complaints/1/attachments/1`, {
       headers: { 'Authorization': `Bearer ${student1Token}` }
     });
-    const data19 = await res19.json();
-    const t19Pass = res19.status === 404 &&
-                    data19?.message === 'Attachment file not found on server.';
-    recordTest(19, 'Missing physical file handled safely with HTTP 404 (no server crash or path leak)', t19Pass,
-      `HTTP ${res19.status}, message: "${data19?.message}"`);
+    const data22 = await res22.json();
+    const t22Pass = res22.status === 404 &&
+                    data22?.message === 'Attachment file not found on server.';
+    recordTest(22, 'Missing physical file handled safely with HTTP 404 (no server crash or path leak)', t22Pass,
+      `HTTP ${res22.status}, message: "${data22?.message}"`);
 
-    // Test 20: No absolute server paths leaked in API responses
+    // Test 23: No absolute server paths leaked in API responses
     const jsonString2 = JSON.stringify(data2);
     const leakedPath = jsonString2.includes('C:\\') ||
                        jsonString2.includes('/Users/') ||
                        jsonString2.includes(rootDir);
-    const t20Pass = !leakedPath &&
+    const t23Pass = !leakedPath &&
                     data2?.complaint?.attachment?.download_url.startsWith('/api/v1/complaints/');
-    recordTest(20, 'Zero absolute physical path leakage in API response payload', t20Pass,
+    recordTest(23, 'Zero absolute physical path leakage in API response payload', t23Pass,
       `Contains absolute root: ${leakedPath}, download_url: "${data2?.complaint?.attachment?.download_url}"`);
 
-    // Test 21: Complaint details (GET /api/v1/complaints/:id) returns attachment metadata
-    const res21 = await fetch(`${baseUrl}/api/v1/complaints/${data2.complaint.id}`, {
+    // Test 24: Complaint details (GET /api/v1/complaints/:id) returns attachment metadata
+    const res24 = await fetch(`${baseUrl}/api/v1/complaints/${data2.complaint.id}`, {
       headers: { 'Authorization': `Bearer ${student1Token}` }
     });
-    const data21 = await res21.json();
-    const c21 = data21?.complaint;
-    const t21Pass = res21.status === 200 &&
-                    c21?.attachment?.id === att2.id &&
-                    c21?.attachment?.download_url === att2.download_url;
-    recordTest(21, 'Complaint details API exposes structured attachment metadata', t21Pass,
-      `HTTP ${res21.status}, att id: ${c21?.attachment?.id}, download_url: "${c21?.attachment?.download_url}"`);
+    const data24 = await res24.json();
+    const c24 = data24?.complaint;
+    const t24Pass = res24.status === 200 &&
+                    c24?.attachment?.id === att2.id &&
+                    c24?.attachment?.download_url === att2.download_url;
+    recordTest(24, 'Complaint details API exposes structured attachment metadata', t24Pass,
+      `HTTP ${res24.status}, att id: ${c24?.attachment?.id}, download_url: "${c24?.attachment?.download_url}"`);
 
-    // Test 22: Simulated Database Failure triggers rollback and unlinks staged file
+    // Test 25: Simulated Database Failure triggers rollback and unlinks staged file
     console.log('\n--- Testing Simulated Database Transaction Rollback & File Cleanup ---');
     const filesBeforeRollback = fs.readdirSync(COMPLAINTS_UPLOAD_DIR).filter((f) => f !== '.gitkeep');
     let rollbackErrorCaught = false;
@@ -514,9 +593,9 @@ async function runSession11Verification() {
     }
 
     const filesAfterRollback = fs.readdirSync(COMPLAINTS_UPLOAD_DIR).filter((f) => f !== '.gitkeep');
-    const t22Pass = rollbackErrorCaught &&
+    const t25Pass = rollbackErrorCaught &&
                     filesAfterRollback.length === filesBeforeRollback.length;
-    recordTest(22, 'Database failure triggers transaction rollback and safely unlinks staged image', t22Pass,
+    recordTest(25, 'Database failure triggers transaction rollback and safely unlinks staged image', t25Pass,
       `Rollback caught: ${rollbackErrorCaught}, disk files before: ${filesBeforeRollback.length}, disk files after: ${filesAfterRollback.length}`);
 
   } finally {

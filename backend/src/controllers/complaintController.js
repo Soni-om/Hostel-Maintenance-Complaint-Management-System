@@ -155,7 +155,7 @@ const ComplaintController = {
   /**
    * Secure authenticated download/stream of a complaint photo attachment
    * GET /api/complaints/:id/attachments/:attachmentId or /api/complaints/:id/attachment
-   * Access: Student owner, Staff, Admin
+   * Access: Student owner, Admin (Staff temporarily restricted pending Phase 3)
    */
   async downloadAttachment(req, res, next) {
     try {
@@ -169,7 +169,20 @@ const ComplaintController = {
         });
       }
 
-      // 1. Fetch attachment record joined with complaint
+      // 1. Staff access policy enforcement (Finding SEC-11-MED-01 Remediation)
+      // Per RBAC Matrix, Staff access requires ticket assignment and hostel domain authorization.
+      // Because Phase 3 (Sessions 13-14) implements staff assignment and domain queue filtering,
+      // Staff attachment downloads are temporarily restricted to prevent cross-hostel data leakage.
+      // Rejection occurs uniformly without revealing attachment existence (anti-enumeration).
+      if (req.user.role === 'staff') {
+        return res.status(403).json({
+          success: false,
+          code: 'FORBIDDEN_ROLE',
+          message: 'Access denied. Staff attachment downloads are temporarily restricted pending ticket assignment and hostel domain authorization in Phase 3.'
+        });
+      }
+
+      // 2. Fetch attachment record joined with complaint
       const attachment = await ComplaintModel.findAttachment({
         complaintId,
         attachmentId
@@ -182,7 +195,7 @@ const ComplaintController = {
         });
       }
 
-      // 2. Authorization check
+      // 3. Authorization check
       // If student: must own the complaint (strict anti-enumeration)
       if (req.user.role === 'student' && attachment.student_id !== req.user.id) {
         return res.status(404).json({
@@ -191,7 +204,16 @@ const ComplaintController = {
         });
       }
 
-      // 3. Resolve physical path safely with path-traversal prevention
+      // If user is neither student nor admin, deny access
+      if (req.user.role !== 'admin' && req.user.role !== 'student') {
+        return res.status(403).json({
+          success: false,
+          code: 'FORBIDDEN_ROLE',
+          message: 'Access denied. Insufficient permissions to view attachments.'
+        });
+      }
+
+      // 4. Resolve physical path safely with path-traversal prevention
       const absolutePath = resolveSafeStoragePath(attachment.storage_key);
 
       if (!fs.existsSync(absolutePath)) {

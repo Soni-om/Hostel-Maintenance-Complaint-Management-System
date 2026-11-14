@@ -219,11 +219,12 @@ Base URL: `http://localhost:5000/api/v1`
 ### 3.4 Download Complaint Attachment
 - **Method:** `GET`
 - **Endpoints:** `/complaints/:id/attachments/:attachmentId` and `/complaints/:id/attachment` (also `/api/v1/complaints/:id/attachments/:attachmentId`)
-- **Access:** Authenticated (`Student` owner, `Staff`, `Admin`)
+- **Access:** Authenticated (`Student` owner, `Admin`; `Staff` temporarily restricted)
 - **Policy & Security:**
   - Enforces `requireAuth`.
-  - If requester is a Student, ownership is enforced (`complaint.student_id === req.user.id`). Unauthorized cross-student attempts return uniform `404 Not Found` to eliminate ID enumeration.
-  - Staff and Admin are authorized to inspect attachments of complaints across the hostel system.
+  - **Student Access:** Strictly enforced ownership (`attachment.student_id === req.user.id`). Unauthorized cross-student attempts and non-existent IDs return an identical `404 Not Found` response (`{ "success": false, "message": "Attachment not found." }`) to eliminate ID enumeration.
+  - **Admin Access:** Authorized for administrative inspection and auditing across all system tickets.
+  - **Staff Access (Temporary Restriction — SEC-11-MED-01):** Temporarily restricted with HTTP 403 `FORBIDDEN_ROLE` (`{ "success": false, "code": "FORBIDDEN_ROLE", "message": "Access denied. Staff attachment downloads are temporarily restricted pending ticket assignment and hostel domain authorization in Phase 3." }`). Staff access will be re-enabled in Sessions 13–14 once ticket assignment (`complaints.assigned_to`) and hostel block scoping are fully implemented.
   - Protects against path traversal via strict `resolveSafeStoragePath` root boundary checks.
   - Streams file directly from private directory (`backend/uploads/complaints/`) with security headers.
 - **Headers Sent by Server:**
@@ -235,6 +236,7 @@ Base URL: `http://localhost:5000/api/v1`
 - **Errors:**
   - `400 Bad Request`: Invalid `:id` or `:attachmentId` format.
   - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `403 Forbidden`: Authenticated user is Staff (`FORBIDDEN_ROLE`, temporarily restricted pending Phase 3 domain authorization) or user with insufficient permissions.
   - `404 Not Found`: Attachment record does not exist, file missing on disk, or inaccessible complaint (`{ "success": false, "message": "Attachment not found." }`).
 
 ### 3.5 Assign / Reassign Complaint

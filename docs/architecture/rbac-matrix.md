@@ -26,6 +26,7 @@
 | **Complaints: Create** | `POST /api/v1/complaints` | ✅ | ❌ | ❌ | Only students can file maintenance requests. |
 | **Complaints: View List** | `GET /api/v1/complaints` | ✅ | ✅ | ✅ | **Student:** Own tickets only.<br>**Staff:** Assigned/Permitted tickets.<br>**Admin:** All system tickets. |
 | **Complaints: View Detail** | `GET /api/v1/complaints/:id` | ✅ | ✅ | ✅ | **Student:** Own ticket only (403 if not owner).<br>**Staff/Admin:** Authorized. |
+| **Complaints: Attachment** | `GET /api/v1/complaints/:id/attachments/:attachmentId` | ✅ | ⏸️ | ✅ | **Student:** Own ticket only (404 anti-enumeration).<br>**Admin:** Authorized for administrative inspection.<br>**Staff:** Temporarily restricted (403 `FORBIDDEN_ROLE`) pending Sessions 13–14 ticket assignment & domain authorization. |
 | **Complaints: Assign** | `POST /api/v1/complaints/:id/assign` | ❌ | ✅ | ✅ | Staff supervisors or Admins only. |
 | **Complaints: Status Update** | `PATCH /api/v1/complaints/:id/status` | ❌ | ✅ | ✅ | Requires valid status lifecycle transition & remarks. |
 | **Complaints: Close** | `PATCH /api/v1/complaints/:id/close` | ✅ | ❌ | ✅ | Student (after satisfaction) or Admin. |
@@ -55,5 +56,17 @@
 | `POST` | `/api/v1/complaints` | Bearer JWT | `student` | Students only. Auto-assigned ticket `HC-YYYYMMDD-XXXX`. | `201`, `400`, `401`, `403` |
 | `GET` | `/api/v1/complaints` | Bearer JWT | All Roles | Student sees own tickets; Staff sees domain; Admin sees all. | `200`, `401`, `403` |
 | `GET` | `/api/v1/complaints/:id` | Bearer JWT | All Roles | Student owner only (403 if unowned); Staff/Admin authorized. | `200`, `401`, `403`, `404` |
+| `GET` | `/api/v1/complaints/:id/attachments/:attachmentId` | Bearer JWT | `student`, `admin` (`staff` restricted) | Student owner only (404 unowned); Admin authorized; Staff temporarily restricted (403 `FORBIDDEN_ROLE`) pending Phase 3 assignment & domain authorization. | `200`, `400`, `401`, `403`, `404` |
 
+---
 
+## 4. Temporary Security Restrictions & Phase 3 Restoration Criteria
+
+### [SEC-11-MED-01] Temporary Staff Attachment Download Restriction
+- **Status**: Implemented & Enforced (Session 11 Remediation).
+- **Policy**: In accordance with the principle of least privilege, Staff access to resident photos must strictly correlate with assigned tickets and hostel domain boundaries (`assigned_to = req.user.id` OR `req.user.hostel_block = complaint.hostel_block`). Because ticket assignment and domain filtering are scheduled for Phase 3 (Sessions 13–14), Staff attachment downloads are temporarily denied with HTTP 403 `FORBIDDEN_ROLE`.
+- **Restoration Criteria**:
+  1. Session 13/14 implements ticket assignment (`complaints.assigned_to`) and hostel block scoping.
+  2. Authorization guard verifies that the requesting staff member is assigned to the complaint or designated for that specific hostel block.
+  3. Non-assigned / cross-hostel staff attempts return uniform HTTP 404 to preserve privacy and prevent ID enumeration.
+  4. Integration tests verify scoped staff access before re-enabling in production.
