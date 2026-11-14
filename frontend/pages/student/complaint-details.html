@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Complaint Details — HostelCare</title>
+  <link rel="stylesheet" href="/assets/css/variables.css">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/components.css">
+  <style>
+    .details-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .details-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .info-item {
+      margin-bottom: 1.25rem;
+    }
+    .info-label {
+      font-size: var(--font-xs);
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.35rem;
+    }
+    .info-value {
+      font-size: var(--font-base);
+      color: var(--color-text-main);
+      font-weight: 500;
+    }
+    .ticket-header-code {
+      font-family: monospace;
+      font-size: var(--font-lg);
+      font-weight: 700;
+      color: var(--color-primary);
+      background: var(--color-bg-muted);
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      display: inline-block;
+    }
+    .remarks-card {
+      background: #f8fafc;
+      border-left: 4px solid var(--color-primary);
+      padding: 1rem 1.25rem;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      margin-top: 0.75rem;
+    }
+    .attachment-preview-container {
+      margin-top: 1rem;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-muted);
+      text-align: center;
+      position: relative;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .attachment-preview-img {
+      max-width: 100%;
+      max-height: 450px;
+      object-fit: contain;
+      cursor: pointer;
+      display: block;
+      margin: 0 auto;
+      transition: transform 0.2s ease;
+    }
+    .attachment-preview-img:hover {
+      transform: scale(1.01);
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="navbar">
+    <div class="container navbar-content">
+      <a href="/" class="brand">
+        <span class="brand-icon">H</span>
+        <span>HostelCare <span style="font-size: var(--font-xs); font-weight: 500; color: var(--color-text-muted);">| Student Workspace</span></span>
+      </a>
+      <div class="flex items-center gap-4">
+        <a href="/pages/student/dashboard.html" class="nav-link">Dashboard</a>
+        <a href="/pages/student/complaints.html" class="nav-link">My Complaints</a>
+        <a href="/pages/student/new-complaint.html" class="btn btn-primary btn-sm">+ New Ticket</a>
+        <div id="student-status-badge" style="font-size: var(--font-xs); color: var(--color-text-muted); display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--color-bg-muted); border-radius: var(--radius-full); border: 1px solid var(--color-border);">
+          <span id="student-dot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 6px rgba(22, 163, 74, 0.6);"></span>
+          <span id="student-status-label">Online</span>
+        </div>
+        <span id="user-display-name" style="font-size: var(--font-sm); font-weight: 600; color: var(--color-text-main);">Student</span>
+        <a href="/pages/auth/login.html" data-action="logout" onclick="if(window.Auth){event.preventDefault();window.Auth.logout();}else if(window.Api){window.Api.clearAuth();}" class="btn btn-secondary btn-sm btn-logout">Log Out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+    <!-- Breadcrumb / Back Link -->
+    <div style="margin-bottom: 1.5rem;">
+      <a href="/pages/student/complaints.html" style="font-size: var(--font-sm); display: inline-flex; align-items: center; gap: 6px; color: var(--color-primary); font-weight: 500;">
+        ← Back to My Complaints
+      </a>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="card" style="text-align: center; padding: 4rem 1rem;">
+      <div class="spinner spinner-primary" style="margin: 0 auto 1rem;"></div>
+      <p class="text-muted text-sm">Loading complaint details...</p>
+    </div>
+
+    <!-- Error / IDOR Not Found Card -->
+    <div id="notfound-card" class="card" style="display: none; text-align: center; padding: 4rem 1.5rem; border-color: var(--color-border);">
+      <div style="font-size: 3.5rem; margin-bottom: 1rem;">🔍</div>
+      <h2 style="margin-bottom: 0.5rem; color: var(--color-text-main);">Complaint Not Found or Inaccessible</h2>
+      <p class="text-muted text-sm" style="max-width: 480px; margin: 0 auto 1.5rem;">
+        This complaint ticket either does not exist or does not belong to your account.
+      </p>
+      <a href="/pages/student/complaints.html" class="btn btn-primary">
+        Return to My Complaints
+      </a>
+    </div>
+
+    <!-- Complaint Content View (Hidden while loading) -->
+    <div id="content-view" style="display: none;">
+      <!-- Title & Header Bar -->
+      <div class="flex justify-between items-center" style="margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <div class="flex items-center gap-3" style="margin-bottom: 0.5rem; flex-wrap: wrap;">
+            <span id="ticket-number" class="ticket-header-code">HC-XXXX</span>
+            <span id="status-badge-slot"></span>
+            <span id="priority-badge-slot"></span>
+          </div>
+          <h1 id="complaint-title" style="margin-bottom: 0.25rem;">Complaint Title</h1>
+          <p class="text-muted text-sm">
+            Filed on <span id="complaint-date" style="font-weight: 500;">-</span>
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary btn-sm" onclick="loadComplaintDetails()">
+            🔄 Refresh Status
+          </button>
+          <a href="/pages/student/new-complaint.html" class="btn btn-primary btn-sm">
+            + New Ticket
+          </a>
+        </div>
+      </div>
+
+      <!-- Main Layout Grid -->
+      <div class="details-grid">
+        <!-- Left Column: Description, Timeline, Remarks & Attachment -->
+        <div class="flex flex-col gap-4">
+          <!-- Description Card -->
+          <div class="card">
+            <h3 class="card-title" style="margin-bottom: 1rem;">Issue Description</h3>
+            <div id="complaint-description" style="white-space: pre-wrap; line-height: 1.6; color: var(--color-text-main); font-size: var(--font-base);">
+              <!-- Rendered safely -->
+            </div>
+          </div>
+
+          <!-- Status Remarks & Timeline Card -->
+          <div class="card">
+            <h3 class="card-title" style="margin-bottom: 0.75rem;">Status Timeline & Remarks</h3>
+            <p class="text-muted text-sm" style="margin-bottom: 0.5rem;">
+              Latest administrative response from hostel maintenance staff:
+            </p>
+            <div id="remarks-box" class="remarks-card">
+              <div id="remarks-text" style="font-size: var(--font-sm); color: var(--color-text-main); line-height: 1.5;">
+                No remarks added yet. Awaiting review by hostel administration.
+              </div>
+            </div>
+          </div>
+
+          <!-- Attachment Card -->
+          <div class="card" id="attachment-card">
+            <div class="flex justify-between items-center" style="margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+              <h3 class="card-title" style="margin-bottom: 0;">Attached Photo</h3>
+              <div id="attachment-actions" style="display: none;">
+                <button id="btn-download-photo" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px;">
+                  ⬇️ Download Photo
+                </button>
+              </div>
+            </div>
+
+            <!-- No attachment state -->
+            <div id="no-attachment-state" style="padding: 1.5rem 1rem; text-align: center; color: var(--color-text-muted); background: var(--color-bg-muted); border-radius: var(--radius-sm); border: 1px dashed var(--color-border);">
+              <span style="font-size: 1.5rem; display: block; margin-bottom: 0.35rem;">📷</span>
+              <span class="text-sm">No photo attachment was uploaded with this complaint.</span>
+            </div>
+
+            <!-- Attachment Content -->
+            <div id="attachment-content" style="display: none;">
+              <!-- Meta summary -->
+              <div style="font-size: var(--font-xs); color: var(--color-text-muted); display: flex; flex-wrap: wrap; gap: 1rem; padding: 0.5rem 0.75rem; background: var(--color-bg-muted); border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
+                <span><strong>File:</strong> <span id="att-filename">-</span></span>
+                <span><strong>Size:</strong> <span id="att-filesize">-</span></span>
+                <span><strong>Type:</strong> <span id="att-mimetype">-</span></span>
+                <span><strong>Uploaded:</strong> <span id="att-date">-</span></span>
+              </div>
+
+              <!-- Preview Image Container -->
+              <div class="attachment-preview-container">
+                <div id="att-preview-loading" style="padding: 2rem;">
+                  <div class="spinner spinner-primary" style="margin: 0 auto 0.75rem;"></div>
+                  <span class="text-xs text-muted">Loading secure attachment stream...</span>
+                </div>
+                <img id="att-preview-img" class="attachment-preview-img" alt="Complaint attachment" style="display: none;" />
+                <div id="att-preview-error" style="display: none; padding: 2rem; color: var(--color-danger); font-size: var(--font-sm);">
+                  ⚠️ Failed to load photo preview. Click "Download Photo" above to retrieve the file directly.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Meta Information -->
+        <div class="flex flex-col gap-4">
+          <div class="card">
+            <h3 class="card-title" style="margin-bottom: 1.25rem;">Ticket Information</h3>
+
+            <div class="info-item">
+              <div class="info-label">Category</div>
+              <div class="info-value" id="complaint-category">-</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">Hostel Location</div>
+              <div class="info-value" id="complaint-location">-</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">Current Status</div>
+              <div class="info-value" id="complaint-status-text">-</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">Priority Level</div>
+              <div class="info-value" id="complaint-priority-text">-</div>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--color-border); margin: 1.25rem 0;" />
+
+            <div class="info-item">
+              <div class="info-label">Date Created</div>
+              <div class="info-value text-sm" id="meta-created-at">-</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">Last Updated</div>
+              <div class="info-value text-sm" id="meta-updated-at">-</div>
+            </div>
+
+            <div class="info-item" style="margin-bottom: 0;">
+              <div class="info-label">Resolved Date</div>
+              <div class="info-value text-sm" id="meta-resolved-at">Pending Resolution</div>
+            </div>
+          </div>
+
+          <!-- Need Help / Student Guidance Card -->
+          <div class="card" style="background: #f8fafc; border: 1px solid var(--color-border);">
+            <h4 style="font-size: var(--font-sm); margin-bottom: 0.5rem; color: var(--color-text-main);">Need Urgent Help?</h4>
+            <p class="text-xs text-muted" style="line-height: 1.5; margin-bottom: 0.75rem;">
+              For immediate emergencies such as water line bursts or electrical short-circuits, notify your hostel caretaker or warden directly.
+            </p>
+            <a href="/pages/student/complaints.html" class="btn btn-secondary btn-sm" style="width: 100%; text-align: center;">
+              View All Complaints
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Frontend Scripts -->
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    // 1. Role enforcement
+    if (window.Auth) {
+      window.Auth.requireAuth(['student']);
+    }
+
+    // 2. Active blob object URL tracking to prevent memory leaks
+    let activeObjectUrl = null;
+
+    // 3. User display initialization
+    function initUserHeader() {
+      if (window.Auth) {
+        const user = window.Auth.getUser();
+        if (user && user.name) {
+          const nameEl = document.getElementById('user-display-name');
+          if (nameEl) nameEl.textContent = user.name;
+        }
+      }
+    }
+
+    // 4. Retrieve ID parameter from URL
+    function getComplaintIdFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const id = parseInt(params.get('id'), 10);
+      return (id && id > 0) ? id : null;
+    }
+
+    // 5. Load Complaint Details
+    async function loadComplaintDetails() {
+      const complaintId = getComplaintIdFromUrl();
+      const loadingState = document.getElementById('loading-state');
+      const notfoundCard = document.getElementById('notfound-card');
+      const contentView = document.getElementById('content-view');
+
+      if (!complaintId) {
+        loadingState.style.display = 'none';
+        notfoundCard.style.display = 'block';
+        contentView.style.display = 'none';
+        return;
+      }
+
+      loadingState.style.display = 'block';
+      notfoundCard.style.display = 'none';
+      contentView.style.display = 'none';
+
+      try {
+        const res = await window.Api.get('/complaints/' + complaintId);
+        const complaint = res.complaint;
+
+        if (!complaint) {
+          loadingState.style.display = 'none';
+          notfoundCard.style.display = 'block';
+          return;
+        }
+
+        renderComplaint(complaint);
+
+        loadingState.style.display = 'none';
+        contentView.style.display = 'block';
+      } catch (err) {
+        console.error('Failed to load complaint details:', err);
+        loadingState.style.display = 'none';
+        notfoundCard.style.display = 'block';
+      }
+    }
+
+    // 6. Render Complaint Data
+    function renderComplaint(complaint) {
+      // Header & Badges
+      const ticketNum = complaint.ticket_number || `HC-#${complaint.id}`;
+      document.getElementById('ticket-number').textContent = ticketNum;
+      document.title = `${ticketNum} — Details — HostelCare`;
+
+      document.getElementById('complaint-title').textContent = complaint.title || 'Untitled';
+      document.getElementById('complaint-date').textContent = complaint.created_at ? window.Utils.formatDate(complaint.created_at) : '-';
+
+      const statusBadgeSlot = document.getElementById('status-badge-slot');
+      statusBadgeSlot.innerHTML = window.Utils.renderStatusBadge(complaint.status || 'pending');
+
+      const priorityBadgeSlot = document.getElementById('priority-badge-slot');
+      priorityBadgeSlot.innerHTML = window.Utils.renderPriorityBadge(complaint.priority || 'normal');
+
+      // Description (safely rendered)
+      const descEl = document.getElementById('complaint-description');
+      descEl.textContent = complaint.description || 'No description provided.';
+
+      // Remarks Box
+      const remarksText = document.getElementById('remarks-text');
+      const latestRemarks = complaint.latest_remarks || complaint.remarks;
+      if (latestRemarks && latestRemarks.trim().length > 0) {
+        remarksText.textContent = latestRemarks.trim();
+      } else {
+        remarksText.textContent = 'Initial complaint filed. Awaiting review and status updates by hostel maintenance staff.';
+      }
+
+      // Ticket Information Meta
+      document.getElementById('complaint-category').textContent = complaint.category_name || 'General';
+      const block = complaint.hostel_block || '-';
+      const room = complaint.room_number || '-';
+      document.getElementById('complaint-location').textContent = `Block ${block} — Room ${room}`;
+
+      const statusFormatted = (complaint.status || 'pending').replace(/_/g, ' ');
+      document.getElementById('complaint-status-text').textContent =
+        statusFormatted.charAt(0).toUpperCase() + statusFormatted.slice(1);
+
+      const priorityFormatted = (complaint.priority || 'normal');
+      document.getElementById('complaint-priority-text').textContent =
+        priorityFormatted.charAt(0).toUpperCase() + priorityFormatted.slice(1);
+
+      document.getElementById('meta-created-at').textContent = complaint.created_at ? window.Utils.formatDate(complaint.created_at) : '-';
+      document.getElementById('meta-updated-at').textContent = complaint.updated_at ? window.Utils.formatDate(complaint.updated_at) : '-';
+      document.getElementById('meta-resolved-at').textContent = complaint.resolved_at ? window.Utils.formatDate(complaint.resolved_at) : 'Pending Resolution';
+
+      // Attachment handling
+      renderAttachment(complaint);
+    }
+
+    // 7. Secure Attachment Streaming & Object URL rendering
+    async function renderAttachment(complaint) {
+      const noAttState = document.getElementById('no-attachment-state');
+      const attContent = document.getElementById('attachment-content');
+      const attActions = document.getElementById('attachment-actions');
+      const attPreviewImg = document.getElementById('att-preview-img');
+      const attLoading = document.getElementById('att-preview-loading');
+      const attError = document.getElementById('att-preview-error');
+      const btnDownload = document.getElementById('btn-download-photo');
+
+      // Clean up previous Object URL if switching complaints or reloading
+      if (activeObjectUrl) {
+        URL.revokeObjectURL(activeObjectUrl);
+        activeObjectUrl = null;
+      }
+
+      if (!complaint.attachment) {
+        noAttState.style.display = 'block';
+        attContent.style.display = 'none';
+        attActions.style.display = 'none';
+        return;
+      }
+
+      const att = complaint.attachment;
+      noAttState.style.display = 'none';
+      attContent.style.display = 'block';
+      attActions.style.display = 'block';
+
+      // Meta info
+      document.getElementById('att-filename').textContent = att.original_name || 'attachment';
+      document.getElementById('att-filesize').textContent = att.size_bytes ? window.Utils.formatFileSize(att.size_bytes) : '-';
+      document.getElementById('att-mimetype').textContent = att.mime_type || 'image/jpeg';
+      document.getElementById('att-date').textContent = att.uploaded_at ? window.Utils.formatDate(att.uploaded_at) : '-';
+
+      // Show spinner while fetching authenticated image stream
+      attLoading.style.display = 'block';
+      attPreviewImg.style.display = 'none';
+      attError.style.display = 'none';
+
+      try {
+        // Fetch raw binary stream via Bearer JWT authenticated endpoint
+        const blob = await window.Api.getBlob(att.download_url);
+        activeObjectUrl = URL.createObjectURL(blob);
+
+        attPreviewImg.src = activeObjectUrl;
+        attPreviewImg.onload = () => {
+          attLoading.style.display = 'none';
+          attPreviewImg.style.display = 'block';
+        };
+
+        // Wire secure direct download button using the fetched blob
+        btnDownload.onclick = () => {
+          const downloadLink = document.createElement('a');
+          downloadLink.href = activeObjectUrl;
+          downloadLink.download = att.original_name || 'complaint-attachment.jpg';
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+        };
+
+        // Allow clicking the preview to view full-resolution image
+        attPreviewImg.onclick = () => {
+          window.open(activeObjectUrl, '_blank');
+        };
+
+      } catch (streamErr) {
+        console.error('Failed to stream secure attachment:', streamErr);
+        attLoading.style.display = 'none';
+        attError.style.display = 'block';
+
+        // Provide fallback download action using window.open on download endpoint
+        btnDownload.onclick = () => {
+          alert('Failed to retrieve attachment stream. Please refresh or verify authorization.');
+        };
+      }
+    }
+
+    // 8. Lifecycle cleanup and initialization
+    window.addEventListener('beforeunload', () => {
+      if (activeObjectUrl) {
+        URL.revokeObjectURL(activeObjectUrl);
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initUserHeader();
+      loadComplaintDetails();
+    });
+  </script>
+</body>
+</html>

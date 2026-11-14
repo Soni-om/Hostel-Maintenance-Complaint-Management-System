@@ -183,6 +183,60 @@ const Api = {
   },
 
   /**
+   * Fetches an authenticated binary blob (e.g. protected complaint attachment)
+   * Safely passes Bearer token to trusted endpoints without exposing file paths
+   * @param {string} endpoint Target URL or relative endpoint
+   * @param {object} options Optional fetch configuration
+   * @returns {Promise<Blob>}
+   */
+  async getBlob(endpoint, options = {}) {
+    const baseUrl = window.CONFIG?.API_BASE_URL || '/api/v1';
+    let url;
+    if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+      url = endpoint;
+    } else if (endpoint.startsWith('/api/')) {
+      const origin = (typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null')
+        ? window.location.origin
+        : 'http://localhost:5000';
+      url = `${origin}${endpoint}`;
+    } else {
+      url = `${baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    }
+
+    const headers = { ...options.headers };
+    const token = this.getToken();
+    if (token && isTrustedOrigin(url, baseUrl) && !headers['Authorization']) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(url, { ...options, headers });
+      if (response.status === 401 && typeof window !== 'undefined') {
+        this.clearAuth();
+        if (window.location && !window.location.pathname.includes('/auth/')) {
+          window.location.href = '/pages/auth/login.html';
+        }
+      }
+
+      if (!response.ok) {
+        let errData = {};
+        try { errData = await response.json(); } catch {}
+        const error = new Error(errData.message || `Attachment fetch failed with HTTP ${response.status}`);
+        error.status = response.status;
+        error.data = errData;
+        throw error;
+      }
+
+      return await response.blob();
+    } catch (err) {
+      if (!options.silent) {
+        console.error(`API getBlob Error [${url}]:`, err.message);
+      }
+      throw err;
+    }
+  },
+
+  /**
    * Fetches real backend and database health from /api/health
    */
   async checkHealth(options = {}) {

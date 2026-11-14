@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lodge New Complaint — HostelCare</title>
+  <link rel="stylesheet" href="/assets/css/variables.css">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/components.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="navbar">
+    <div class="container navbar-content">
+      <a href="/" class="brand">
+        <span class="brand-icon">H</span>
+        <span>HostelCare <span style="font-size: var(--font-xs); font-weight: 500; color: var(--color-text-muted);">| Student Workspace</span></span>
+      </a>
+      <div class="flex items-center gap-4">
+        <a href="/pages/student/dashboard.html" class="nav-link">Dashboard</a>
+        <a href="/pages/student/complaints.html" class="nav-link">My Complaints</a>
+        <div id="student-status-badge" style="font-size: var(--font-xs); color: var(--color-text-muted); display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--color-bg-muted); border-radius: var(--radius-full); border: 1px solid var(--color-border);">
+          <span id="student-dot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-light);"></span>
+          <span id="student-status-label">Online</span>
+        </div>
+        <span id="user-display-name" style="font-size: var(--font-sm); font-weight: 600; color: var(--color-text-main);">Student</span>
+        <a href="/pages/auth/login.html" data-action="logout" onclick="if(window.Auth){event.preventDefault();window.Auth.logout();}else if(window.Api){window.Api.clearAuth();}" class="btn btn-secondary btn-sm btn-logout">Log Out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container container-narrow" style="padding-top: 2.5rem; padding-bottom: 3rem;">
+    <!-- Breadcrumb / Back Link -->
+    <div style="margin-bottom: 1.5rem;">
+      <a href="/pages/student/dashboard.html" style="font-size: var(--font-sm); display: inline-flex; align-items: center; gap: 6px;">
+        ← Back to Student Dashboard
+      </a>
+    </div>
+
+    <!-- Page Heading -->
+    <div style="margin-bottom: 2rem;">
+      <h1>Lodge Maintenance Complaint</h1>
+      <p class="text-muted text-sm">Report a room or hostel facility issue. An official ticket number will be generated immediately.</p>
+    </div>
+
+    <!-- Success Confirmation State (Hidden initially) -->
+    <div id="success-panel" class="card" style="display: none; text-align: center; padding: 3rem 2rem; border-color: #bbf7d0; background: #f0fdf4;">
+      <div style="font-size: 3.5rem; margin-bottom: 1rem;">🎉</div>
+      <h2 style="color: #166534; margin-bottom: 0.5rem;">Complaint Lodged Successfully!</h2>
+      <p class="text-muted text-sm" style="max-width: 480px; margin: 0 auto 1.5rem;">
+        Your maintenance request has been submitted to hostel operations. An automated tracking ticket has been assigned to your issue:
+      </p>
+
+      <div style="display: inline-block; background: var(--color-bg-surface); padding: 1rem 2rem; border-radius: var(--radius-lg); border: 2px dashed #16a34a; margin-bottom: 2rem;">
+        <div style="font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); margin-bottom: 4px;">Assigned Ticket Number</div>
+        <div id="success-ticket-number" style="font-size: 1.75rem; font-weight: 800; color: var(--color-primary); font-family: monospace;">
+          HC-YYYYMMDD-XXXX
+        </div>
+      </div>
+
+      <div class="flex justify-center gap-3" style="flex-wrap: wrap;">
+        <a id="success-details-link" href="#" class="btn btn-primary">View Complaint Details</a>
+        <a href="/pages/student/complaints.html" class="btn btn-secondary">My Complaints List</a>
+        <button id="btn-lodge-another" class="btn btn-secondary" onclick="resetFormForAnother()">Lodge Another Ticket</button>
+      </div>
+    </div>
+
+    <!-- Complaint Form Card -->
+    <div id="form-card" class="card">
+      <!-- Error Alert Box -->
+      <div id="form-error-alert" class="alert alert-danger" style="display: none;"></div>
+
+      <!-- Authenticated Profile Notice -->
+      <div style="background: var(--color-bg-muted); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <span style="font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); display: block; font-weight: 600;">Registered Location</span>
+          <span id="registered-location" style="font-weight: 700; color: var(--color-text-main); font-size: var(--font-sm);">
+            Loading profile...
+          </span>
+        </div>
+        <div style="font-size: var(--font-xs); color: var(--color-text-muted);">
+          Protected by Student Profile
+        </div>
+      </div>
+
+      <form id="new-complaint-form" novalidate>
+        <!-- Category Selection -->
+        <div class="form-group">
+          <label class="form-label" for="category_id">
+            Complaint Category <span style="color: var(--color-danger);">*</span>
+          </label>
+          <select id="category_id" class="form-select" required>
+            <option value="">Select a category...</option>
+          </select>
+          <div id="category-hint" class="text-xs text-muted" style="margin-top: 4px; display: none;"></div>
+          <div id="category-error" class="text-xs" style="color: var(--color-danger); margin-top: 4px; display: none;"></div>
+        </div>
+
+        <!-- Complaint Title -->
+        <div class="form-group">
+          <div class="flex justify-between items-center" style="margin-bottom: var(--space-2);">
+            <label class="form-label" for="title" style="margin-bottom: 0;">
+              Issue Title / Summary <span style="color: var(--color-danger);">*</span>
+            </label>
+            <span id="title-char-count" class="text-xs text-muted">0 / 150</span>
+          </div>
+          <input
+            type="text"
+            id="title"
+            class="form-input"
+            minlength="5"
+            maxlength="150"
+            placeholder="e.g. Ceiling fan regulator burnt and sparking on speed 3"
+            required
+          >
+          <div id="title-error" class="text-xs" style="color: var(--color-danger); margin-top: 4px; display: none;"></div>
+        </div>
+
+        <!-- Complaint Description -->
+        <div class="form-group">
+          <div class="flex justify-between items-center" style="margin-bottom: var(--space-2);">
+            <label class="form-label" for="description" style="margin-bottom: 0;">
+              Detailed Description <span style="color: var(--color-danger);">*</span>
+            </label>
+            <span id="desc-char-count" class="text-xs text-muted">0 / 2000</span>
+          </div>
+          <textarea
+            id="description"
+            class="form-textarea"
+            rows="5"
+            minlength="10"
+            maxlength="2000"
+            placeholder="Describe the issue, exact room location, when it started, and any safety hazards..."
+            required
+          ></textarea>
+          <div id="desc-error" class="text-xs" style="color: var(--color-danger); margin-top: 4px; display: none;"></div>
+        </div>
+
+        <!-- Optional Room Number Check (Read-Only / Profile Verified) -->
+        <input type="hidden" id="room_number" value="">
+
+        <!-- Photo Upload Section (Optional) -->
+        <div class="form-group" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border);">
+          <label class="form-label" for="photo-input">
+            Photo Attachment <span class="text-muted text-xs" style="font-weight: normal;">(Optional photo evidence)</span>
+          </label>
+          <p class="text-xs text-muted" style="margin-bottom: 0.75rem;">
+            Upload clear photograph evidence (JPEG, PNG, or WEBP, maximum 5MB). EXIF metadata will be stripped securely.
+          </p>
+
+          <!-- Dropzone Container -->
+          <div id="photo-dropzone" class="photo-dropzone" onclick="document.getElementById('photo-input').click()">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📷</div>
+            <div style="font-size: var(--font-sm); font-weight: 600; color: var(--color-text-main);">
+              Click to select a photo, or drag and drop image here
+            </div>
+            <div class="text-xs text-muted" style="margin-top: 4px;">
+              PNG, JPG, or WEBP up to 5 MB
+            </div>
+          </div>
+          <input
+            type="file"
+            id="photo-input"
+            accept="image/jpeg,image/png,image/webp"
+            style="display: none;"
+          >
+
+          <!-- Client Validation Error -->
+          <div id="photo-error" class="text-xs" style="color: var(--color-danger); margin-top: 6px; display: none;"></div>
+
+          <!-- Selected Photo Preview Box -->
+          <div id="photo-preview-box" class="photo-preview-wrap" style="display: none;">
+            <img id="photo-preview-img" src="" alt="Photo Preview" class="photo-preview-img">
+            <div style="flex: 1; min-width: 0;">
+              <div id="photo-name" style="font-size: var(--font-sm); font-weight: 600; color: var(--color-text-main); word-break: break-all;">photo.jpg</div>
+              <div id="photo-size" class="text-xs text-muted">0 KB</div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="clearSelectedPhoto()">Remove</button>
+          </div>
+        </div>
+
+        <!-- Submission Buttons & Loading State -->
+        <div style="margin-top: 2rem; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3);">
+          <a href="/pages/student/dashboard.html" class="btn btn-secondary">Cancel</a>
+          <button type="submit" id="submit-btn" class="btn btn-primary" style="min-width: 170px;">
+            <span id="submit-spinner" class="spinner" style="display: none; margin-right: 6px;"></span>
+            <span id="submit-text">Submit Complaint</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    // Enforce Student Role
+    if (window.Auth) {
+      window.Auth.requireAuth(['student']);
+    }
+
+    let categoriesCache = [];
+    let selectedFile = null;
+    let isSubmitting = false;
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB (5,242,880 bytes)
+    const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+    const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
+
+    // Load Student Profile Information
+    async function initProfile() {
+      let user = window.Auth?.getUser();
+      try {
+        if (!user || !user.hostel_block) {
+          user = await window.Auth?.fetchProfile();
+        }
+      } catch (err) {
+        console.warn('Profile fetch warning:', err);
+      }
+
+      if (user) {
+        const nameEl = document.getElementById('user-display-name');
+        if (nameEl) nameEl.textContent = user.name || 'Student';
+
+        const locEl = document.getElementById('registered-location');
+        if (locEl) {
+          locEl.textContent = `${user.hostel_block || 'Assigned Block'} — Room ${user.room_number || 'N/A'}`;
+        }
+        const roomInput = document.getElementById('room_number');
+        if (roomInput && user.room_number) {
+          roomInput.value = user.room_number;
+        }
+      }
+    }
+
+    // Load Active Complaint Categories
+    async function loadCategories() {
+      const select = document.getElementById('category_id');
+      const hint = document.getElementById('category-hint');
+      try {
+        const response = await window.Api.get('/categories');
+        categoriesCache = response.categories || [];
+        select.innerHTML = '<option value="">Select a category...</option>';
+        categoriesCache.forEach((cat) => {
+          const opt = document.createElement('option');
+          opt.value = cat.id;
+          opt.textContent = cat.name;
+          select.appendChild(opt);
+        });
+
+        select.addEventListener('change', () => {
+          const catId = parseInt(select.value, 10);
+          const found = categoriesCache.find((c) => c.id === catId);
+          if (found && found.description) {
+            hint.textContent = found.description;
+            hint.style.display = 'block';
+          } else {
+            hint.style.display = 'none';
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load categories:', err);
+        select.innerHTML = '<option value="">Failed to load categories (click to retry)</option>';
+        select.onclick = () => { select.onclick = null; loadCategories(); };
+        Utils.showToast('Failed to load categories. Please verify your connection.', 'danger');
+      }
+    }
+
+    // File Input Validation & Preview
+    const photoInput = document.getElementById('photo-input');
+    const photoDropzone = document.getElementById('photo-dropzone');
+    const photoError = document.getElementById('photo-error');
+    const photoPreviewBox = document.getElementById('photo-preview-box');
+    const photoPreviewImg = document.getElementById('photo-preview-img');
+    const photoName = document.getElementById('photo-name');
+    const photoSize = document.getElementById('photo-size');
+
+    function handleFileSelection(file) {
+      photoError.style.display = 'none';
+      photoError.textContent = '';
+
+      if (!file) {
+        clearSelectedPhoto();
+        return;
+      }
+
+      // 1. Extension & MIME Type Check
+      const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+      const isValidExt = ALLOWED_EXTENSIONS.includes(ext);
+      const isValidMime = ALLOWED_MIME_TYPES.includes(file.type.toLowerCase());
+
+      if (!isValidExt && !isValidMime) {
+        photoError.textContent = 'Invalid file type. Only JPEG, PNG, and WEBP photographs are allowed.';
+        photoError.style.display = 'block';
+        clearSelectedPhoto();
+        return;
+      }
+
+      // 2. Exact 5 MB Size Cap Check (5 * 1024 * 1024 = 5,242,880 bytes)
+      if (file.size > MAX_FILE_SIZE) {
+        photoError.textContent = `File size (${Utils.formatFileSize(file.size)}) exceeds the maximum permitted limit of 5MB.`;
+        photoError.style.display = 'block';
+        clearSelectedPhoto();
+        return;
+      }
+
+      selectedFile = file;
+      photoName.textContent = file.name;
+      photoSize.textContent = Utils.formatFileSize(file.size);
+
+      // Render local ObjectURL preview
+      const objectUrl = URL.createObjectURL(file);
+      photoPreviewImg.src = objectUrl;
+      photoPreviewBox.style.display = 'flex';
+      photoDropzone.style.display = 'none';
+    }
+
+    photoInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      handleFileSelection(file);
+    });
+
+    // Drag & Drop Support
+    photoDropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      photoDropzone.style.borderColor = 'var(--color-primary)';
+      photoDropzone.style.backgroundColor = '#f0f7ff';
+    });
+    photoDropzone.addEventListener('dragleave', () => {
+      photoDropzone.style.borderColor = 'var(--color-border)';
+      photoDropzone.style.backgroundColor = 'var(--color-bg-muted)';
+    });
+    photoDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      photoDropzone.style.borderColor = 'var(--color-border)';
+      photoDropzone.style.backgroundColor = 'var(--color-bg-muted)';
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      handleFileSelection(file);
+    });
+
+    window.clearSelectedPhoto = function() {
+      selectedFile = null;
+      photoInput.value = '';
+      photoPreviewImg.src = '';
+      photoPreviewBox.style.display = 'none';
+      photoDropzone.style.display = 'block';
+      photoError.style.display = 'none';
+    };
+
+    // Live Character Counters
+    const titleInput = document.getElementById('title');
+    const titleCount = document.getElementById('title-char-count');
+    titleInput.addEventListener('input', () => {
+      titleCount.textContent = `${titleInput.value.length} / 150`;
+    });
+
+    const descInput = document.getElementById('description');
+    const descCount = document.getElementById('desc-char-count');
+    descInput.addEventListener('input', () => {
+      descCount.textContent = `${descInput.value.length} / 2000`;
+    });
+
+    // Reset Form for Another Complaint
+    window.resetFormForAnother = function() {
+      document.getElementById('new-complaint-form').reset();
+      clearSelectedPhoto();
+      titleCount.textContent = '0 / 150';
+      descCount.textContent = '0 / 2000';
+      document.getElementById('form-error-alert').style.display = 'none';
+      document.getElementById('success-panel').style.display = 'none';
+      document.getElementById('form-card').style.display = 'block';
+    };
+
+    // Form Submission Handler
+    const form = document.getElementById('new-complaint-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const submitText = document.getElementById('submit-text');
+    const submitSpinner = document.getElementById('submit-spinner');
+    const formAlert = document.getElementById('form-error-alert');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (isSubmitting) return;
+
+      // Reset error states
+      formAlert.style.display = 'none';
+      formAlert.textContent = '';
+      document.getElementById('category-error').style.display = 'none';
+      document.getElementById('title-error').style.display = 'none';
+      document.getElementById('desc-error').style.display = 'none';
+
+      const categoryIdVal = document.getElementById('category_id').value;
+      const titleVal = titleInput.value.trim();
+      const descVal = descInput.value.trim();
+
+      // Client-side Validation Checks
+      let hasError = false;
+      if (!categoryIdVal) {
+        document.getElementById('category-error').textContent = 'Please select a complaint category.';
+        document.getElementById('category-error').style.display = 'block';
+        hasError = true;
+      }
+      if (!titleVal || titleVal.length < 5) {
+        document.getElementById('title-error').textContent = 'Title must be at least 5 characters long.';
+        document.getElementById('title-error').style.display = 'block';
+        hasError = true;
+      }
+      if (!descVal || descVal.length < 10) {
+        document.getElementById('desc-error').textContent = 'Description must be at least 10 characters long.';
+        document.getElementById('desc-error').style.display = 'block';
+        hasError = true;
+      }
+
+      if (hasError) return;
+
+      // Prepare FormData payload (multipart/form-data)
+      const formData = new FormData();
+      formData.append('category_id', categoryIdVal);
+      formData.append('title', titleVal);
+      formData.append('description', descVal);
+
+      // Attach photo only if selected
+      if (selectedFile) {
+        formData.append('photo', selectedFile);
+      }
+
+      // Enter loading state & prevent duplicate submission
+      isSubmitting = true;
+      submitBtn.disabled = true;
+      submitSpinner.style.display = 'inline-block';
+      submitText.textContent = 'Submitting Ticket...';
+
+      try {
+        // Dispatch via centralized Api wrapper (handles Bearer JWT & FormData boundary)
+        const response = await window.Api.post('/complaints', formData);
+
+        if (response.success && response.complaint) {
+          const complaint = response.complaint;
+          // Switch to Success View
+          document.getElementById('form-card').style.display = 'none';
+          document.getElementById('success-ticket-number').textContent = complaint.ticket_number || 'HC-CONFIRMED';
+          document.getElementById('success-details-link').href = `/pages/student/complaint-details.html?id=${complaint.id}`;
+          document.getElementById('success-panel').style.display = 'block';
+
+          Utils.showToast(`Ticket ${complaint.ticket_number} created successfully!`, 'success');
+        } else {
+          throw new Error(response.message || 'Complaint creation did not return a valid record.');
+        }
+      } catch (err) {
+        console.error('Complaint submission error:', err);
+        const errMsg = err.data?.message || err.message || 'Failed to submit complaint. Please try again.';
+        formAlert.textContent = errMsg;
+        formAlert.style.display = 'block';
+        Utils.showToast(errMsg, 'danger');
+      } finally {
+        isSubmitting = false;
+        submitBtn.disabled = false;
+        submitSpinner.style.display = 'none';
+        submitText.textContent = 'Submit Complaint';
+      }
+    });
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      initProfile();
+      loadCategories();
+    });
+  </script>
+</body>
+</html>

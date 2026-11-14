@@ -7,6 +7,28 @@
   <link rel="stylesheet" href="/assets/css/variables.css">
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/components.css">
+  <style>
+    .ticket-cell {
+      font-family: monospace;
+      font-weight: 600;
+      color: var(--color-primary);
+    }
+    .badge-has-photo {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11px;
+      color: var(--color-text-muted);
+      background: var(--color-bg-muted);
+      padding: 1px 6px;
+      border-radius: var(--radius-sm);
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .table td {
+      vertical-align: middle;
+    }
+  </style>
 </head>
 <body>
   <!-- Header -->
@@ -17,28 +39,32 @@
         <span>HostelCare <span style="font-size: var(--font-xs); font-weight: 500; color: var(--color-text-muted);">| Student Workspace</span></span>
       </a>
       <div class="flex items-center gap-4">
+        <a href="/pages/student/dashboard.html" class="nav-link active" style="font-weight: 600; color: var(--color-primary);">Dashboard</a>
+        <a href="/pages/student/complaints.html" class="nav-link">My Complaints</a>
         <div id="student-status-badge" style="font-size: var(--font-xs); color: var(--color-text-muted); display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--color-bg-muted); border-radius: var(--radius-full); border: 1px solid var(--color-border);">
           <span id="student-dot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-light);"></span>
           <span id="student-status-label">Checking API...</span>
         </div>
         <span id="user-display-name" style="font-size: var(--font-sm); font-weight: 600; color: var(--color-text-main);">Student</span>
-        <a href="/" class="btn btn-secondary btn-sm">Home</a>
-        <a href="/pages/auth/login.html" data-action="logout" onclick="if(window.Auth){event.preventDefault();window.Auth.logout();}else if(window.Api){window.Api.clearAuth();}" class="btn btn-primary btn-sm btn-logout">Log Out</a>
+        <a href="/pages/auth/login.html" data-action="logout" onclick="if(window.Auth){event.preventDefault();window.Auth.logout();}else if(window.Api){window.Api.clearAuth();}" class="btn btn-secondary btn-sm btn-logout">Log Out</a>
       </div>
     </div>
   </header>
 
-  <main class="container" style="padding-top: 2.5rem; padding-bottom: 3rem;">
+  <main class="container" style="padding-top: 2.5rem; padding-bottom: 3.5rem;">
     <!-- Welcome Header -->
     <div class="flex justify-between items-center" style="margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
       <div>
-        <h1>Student Maintenance Portal</h1>
-        <p class="text-muted">Track your maintenance tickets and submit new hostel service requests.</p>
+        <h1 id="welcome-heading">Student Maintenance Portal</h1>
+        <p class="text-muted text-sm">Track your maintenance tickets and submit new hostel service requests.</p>
       </div>
-      <div>
-        <button class="btn btn-primary" onclick="alert('Complaint submission form will be integrated in Session 6.')">
-          + New Complaint Ticket
+      <div class="flex gap-2">
+        <button class="btn btn-secondary" onclick="loadDashboardData()" title="Refresh Dashboard">
+          🔄 Refresh
         </button>
+        <a href="/pages/student/new-complaint.html" class="btn btn-primary">
+          + New Complaint Ticket
+        </a>
       </div>
     </div>
 
@@ -47,49 +73,84 @@
       <div class="stat-card">
         <div>
           <div class="stat-label">Total Filed</div>
-          <div class="stat-value">0</div>
+          <div class="stat-value" id="stat-total">0</div>
         </div>
         <div style="font-size: 2rem;">📋</div>
       </div>
       <div class="stat-card">
         <div>
           <div class="stat-label">In Progress</div>
-          <div class="stat-value" style="color: var(--color-primary);">0</div>
+          <div class="stat-value" id="stat-inprogress" style="color: var(--color-primary);">0</div>
         </div>
         <div style="font-size: 2rem;">⏳</div>
       </div>
       <div class="stat-card">
         <div>
           <div class="stat-label">Resolved</div>
-          <div class="stat-value" style="color: var(--color-success);">0</div>
+          <div class="stat-value" id="stat-resolved" style="color: var(--color-success);">0</div>
         </div>
         <div style="font-size: 2rem;">✅</div>
       </div>
       <div class="stat-card">
         <div>
           <div class="stat-label">Pending Review</div>
-          <div class="stat-value" style="color: var(--color-warning);">0</div>
+          <div class="stat-value" id="stat-pending" style="color: var(--color-warning);">0</div>
         </div>
         <div style="font-size: 2rem;">🔔</div>
       </div>
     </div>
 
     <!-- Recent Complaints Table Panel -->
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">My Recent Complaints</h3>
-        <span class="badge badge-inprogress">Session 1 Baseline</span>
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div class="card-header flex justify-between items-center" style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--color-border);">
+        <div>
+          <h3 class="card-title" style="margin-bottom: 0.25rem;">My Recent Complaints</h3>
+          <p class="text-muted text-xs" style="margin: 0;">Recently lodged requests and real-time status</p>
+        </div>
+        <div>
+          <a href="/pages/student/complaints.html" class="text-sm font-semibold" style="color: var(--color-primary);">
+            View All Complaints →
+          </a>
+        </div>
       </div>
-      
-      <div style="text-align: center; padding: 3rem 1rem;">
+
+      <!-- Loading State -->
+      <div id="loading-state" style="text-align: center; padding: 3rem 1rem;">
+        <div class="spinner spinner-primary" style="margin: 0 auto 0.75rem;"></div>
+        <p class="text-muted text-sm">Loading dashboard data...</p>
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-state" style="display: none; text-align: center; padding: 3.5rem 1.5rem;">
         <div style="font-size: 3rem; margin-bottom: 1rem;">📂</div>
         <h3>No complaints lodged yet</h3>
-        <p class="text-muted text-sm" style="max-width: 400px; margin: 0 auto 1.5rem;">
+        <p class="text-muted text-sm" style="max-width: 440px; margin: 0 auto 1.5rem;">
           When you report maintenance issues (electrical, plumbing, cleaning, or room repairs), your ticket timeline will appear here.
         </p>
-        <button class="btn btn-secondary btn-sm" onclick="alert('Ticket creation will be wired in Phase 2 (Sessions 6-9).')">
+        <a href="/pages/student/new-complaint.html" class="btn btn-primary btn-sm">
           Lodge First Complaint
-        </button>
+        </a>
+      </div>
+
+      <!-- Data Table -->
+      <div id="table-container" class="table-responsive" style="display: none;">
+        <table class="table" style="margin-bottom: 0;">
+          <thead>
+            <tr>
+              <th style="width: 140px;">Ticket #</th>
+              <th>Category</th>
+              <th>Title</th>
+              <th>Location</th>
+              <th style="width: 100px;">Priority</th>
+              <th style="width: 120px;">Status</th>
+              <th style="width: 130px;">Filed Date</th>
+              <th style="width: 110px; text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="recent-complaints-tbody">
+            <!-- Dynamically populated rows -->
+          </tbody>
+        </table>
       </div>
     </div>
   </main>
@@ -99,11 +160,25 @@
   <script src="/js/utils.js"></script>
   <script src="/js/auth.js"></script>
   <script>
-    // Enforce student role access control and background profile verification
+    // Enforce student role access control
     if (window.Auth) {
       window.Auth.requireAuth(['student']);
     }
 
+    // Initialize user details in header
+    function initUserHeader() {
+      if (window.Auth) {
+        const user = window.Auth.getUser();
+        if (user && user.name) {
+          const nameEl = document.getElementById('user-display-name');
+          if (nameEl) nameEl.textContent = user.name;
+          const welcomeHeading = document.getElementById('welcome-heading');
+          if (welcomeHeading) welcomeHeading.textContent = `Welcome, ${user.name.split(' ')[0]}!`;
+        }
+      }
+    }
+
+    // Backend & Database health check
     async function checkStatus() {
       const dot = document.getElementById('student-dot');
       const label = document.getElementById('student-status-label');
@@ -129,8 +204,113 @@
         }
       }
     }
-    document.addEventListener('DOMContentLoaded', checkStatus);
+
+    // Fetch and populate metrics & recent complaints
+    async function loadDashboardData() {
+      const loadingState = document.getElementById('loading-state');
+      const emptyState = document.getElementById('empty-state');
+      const tableContainer = document.getElementById('table-container');
+      const tbody = document.getElementById('recent-complaints-tbody');
+
+      loadingState.style.display = 'block';
+      emptyState.style.display = 'none';
+      tableContainer.style.display = 'none';
+
+      try {
+        // Fetch up to 50 recent complaints to compute KPI metric counters accurately
+        const res = await window.Api.get('/complaints/mine?limit=50');
+        const complaints = res.complaints || [];
+        const total = (res.pagination && typeof res.pagination.total === 'number')
+          ? res.pagination.total
+          : complaints.length;
+
+        // Compute metrics
+        let countInProgress = 0;
+        let countResolved = 0;
+        let countPending = 0;
+
+        complaints.forEach(item => {
+          if (item.status === 'in_progress') countInProgress++;
+          else if (item.status === 'resolved') countResolved++;
+          else if (item.status === 'pending') countPending++;
+        });
+
+        // Update KPI cards
+        document.getElementById('stat-total').textContent = total;
+        document.getElementById('stat-inprogress').textContent = countInProgress;
+        document.getElementById('stat-resolved').textContent = countResolved;
+        document.getElementById('stat-pending').textContent = countPending;
+
+        loadingState.style.display = 'none';
+
+        if (complaints.length === 0) {
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        // Render top 5 recent complaints
+        const recentComplaints = complaints.slice(0, 5);
+        tbody.innerHTML = '';
+
+        recentComplaints.forEach(item => {
+          const tr = document.createElement('tr');
+
+          const ticketSafe = window.Utils.escapeHtml(item.ticket_number || `HC-#${item.id}`);
+          const titleSafe = window.Utils.escapeHtml(item.title || 'Untitled');
+          const catSafe = window.Utils.escapeHtml(item.category_name || 'General');
+          const blockSafe = window.Utils.escapeHtml(item.hostel_block || '-');
+          const roomSafe = window.Utils.escapeHtml(item.room_number || '-');
+          const dateSafe = item.created_at ? window.Utils.formatDate(item.created_at) : '-';
+
+          const priorityBadge = window.Utils.renderPriorityBadge(item.priority || 'normal');
+          const statusBadge = window.Utils.renderStatusBadge(item.status || 'pending');
+
+          const attachmentIndicator = item.has_attachment || item.attachment
+            ? '<span class="badge-has-photo" title="Photo attachment included">📎 Photo</span>'
+            : '';
+
+          tr.innerHTML = `
+            <td>
+              <span class="ticket-cell">${ticketSafe}</span>
+            </td>
+            <td>
+              <span style="font-weight: 500;">${catSafe}</span>
+            </td>
+            <td>
+              <span style="font-weight: 500; color: var(--color-text-main);">${titleSafe}</span>
+              ${attachmentIndicator}
+            </td>
+            <td>
+              <span class="text-sm text-muted">Block ${blockSafe}, Rm ${roomSafe}</span>
+            </td>
+            <td>${priorityBadge}</td>
+            <td>${statusBadge}</td>
+            <td class="text-sm text-muted">${dateSafe}</td>
+            <td style="text-align: right;">
+              <a href="/pages/student/complaint-details.html?id=${item.id}" class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.65rem; font-size: var(--font-xs);">
+                View Details
+              </a>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        tableContainer.style.display = 'block';
+
+      } catch (err) {
+        console.error('Failed to load dashboard data:', err);
+        loadingState.style.display = 'none';
+        emptyState.style.display = 'block';
+        const emptyTitle = emptyState.querySelector('h3');
+        if (emptyTitle) emptyTitle.textContent = 'Could not load complaints';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initUserHeader();
+      checkStatus();
+      loadDashboardData();
+    });
   </script>
 </body>
 </html>
-

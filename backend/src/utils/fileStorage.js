@@ -24,15 +24,22 @@ if (!fs.existsSync(COMPLAINTS_UPLOAD_DIR)) {
 
 /**
  * Safely unlinks a file from disk without throwing unhandled exceptions
- * @param {string} filePath 
+ * @param {string} filePath Path to file to delete
+ * @returns {Promise<boolean>} True if file was deleted, false if file did not exist or error occurred
  */
 export async function unlinkFileSafely(filePath) {
   try {
-    if (filePath && fs.existsSync(filePath)) {
-      await fs.promises.unlink(filePath);
+    if (!filePath || typeof filePath !== 'string') {
+      return false;
     }
+    if (!fs.existsSync(filePath)) {
+      return false;
+    }
+    await fs.promises.unlink(filePath);
+    return true;
   } catch (err) {
     console.error('Warning: Failed to unlink file:', filePath, err.message);
+    return false;
   }
 }
 
