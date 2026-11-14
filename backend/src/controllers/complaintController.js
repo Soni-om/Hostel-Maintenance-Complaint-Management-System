@@ -54,6 +54,78 @@ const ComplaintController = {
         message: 'An unexpected internal error occurred while lodging the complaint.'
       });
     }
+  },
+
+  /**
+   * Retrieves paginated complaints for the authenticated student
+   * GET /api/complaints/mine or /api/v1/complaints/mine (and /api/complaints)
+   * Access: Student only
+   */
+  async getStudentComplaints(req, res, next) {
+    try {
+      const studentId = req.user.id;
+      const { page, limit, status, category_id } = req.query;
+
+      const result = await ComplaintModel.findStudentComplaints({
+        studentId,
+        page: page ? parseInt(page, 10) : 1,
+        limit: limit ? parseInt(limit, 10) : 10,
+        status: status ? status.trim().toLowerCase() : undefined,
+        categoryId: category_id ? parseInt(category_id, 10) : undefined
+      });
+
+      return res.status(200).json({
+        success: true,
+        complaints: result.complaints,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages
+        }
+      });
+    } catch (error) {
+      console.error('Get Student Complaints Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while retrieving your complaints.'
+      });
+    }
+  },
+
+  /**
+   * Retrieves details of a specific complaint owned by the authenticated student
+   * GET /api/complaints/:id or /api/v1/complaints/:id
+   * Access: Student owner only
+   */
+  async getStudentComplaintById(req, res, next) {
+    try {
+      const studentId = req.user.id;
+      const complaintId = parseInt(req.params.id, 10);
+
+      const complaint = await ComplaintModel.findStudentComplaintById({
+        complaintId,
+        studentId
+      });
+
+      if (!complaint) {
+        return res.status(404).json({
+          success: false,
+          message: 'Complaint not found.'
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        complaint
+      });
+    } catch (error) {
+      console.error('Get Student Complaint By ID Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while retrieving complaint details.'
+      });
+    }
   }
 };
 

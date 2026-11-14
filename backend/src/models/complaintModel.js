@@ -149,6 +149,108 @@ const ComplaintModel = {
       [ticketNumber]
     );
     return rows.length > 0 ? rows[0] : null;
+  },
+
+  /**
+   * Finds paginated complaints belonging to a specific student with optional filters
+   * Enforces strict ownership, newest-first ordering (created_at DESC, id DESC), and category join
+   * 
+   * @param {object} params
+   * @param {number} params.studentId
+   * @param {number} [params.page=1]
+   * @param {number} [params.limit=10]
+   * @param {string} [params.status]
+   * @param {number} [params.categoryId]
+   * @returns {Promise<{ complaints: Array<object>, total: number, page: number, limit: number, totalPages: number }>}
+   */
+  async findStudentComplaints({ studentId, page = 1, limit = 10, status, categoryId } = {}) {
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+    const offset = (pageNum - 1) * limitNum;
+
+    const whereClauses = ['c.student_id = ?'];
+    const queryParams = [studentId];
+
+    if (status && status.trim()) {
+      whereClauses.push('c.status = ?');
+      queryParams.push(status.trim().toLowerCase());
+    }
+
+    if (categoryId && parseInt(categoryId, 10) > 0) {
+      whereClauses.push('c.category_id = ?');
+      queryParams.push(parseInt(categoryId, 10));
+    }
+
+    const whereSql = whereClauses.join(' AND ');
+
+    // 1. Total count query with exact same ownership and filter conditions
+    const countSql = `SELECT COUNT(*) AS total FROM complaints c WHERE ${whereSql}`;
+    const [countRows] = await pool.query(countSql, queryParams);
+    const total = countRows[0]?.total || 0;
+    const totalPages = Math.ceil(total / limitNum) || 1;
+
+    // 2. Data selection query with category join and newest-first ordering
+    const dataSql = `
+      SELECT c.id, c.ticket_number, c.student_id, c.category_id,
+             cat.name AS category_name,
+             c.title, c.description, c.block_id, c.hostel_block,
+             c.room_number, c.priority, c.status, c.created_at,
+             c.updated_at, c.resolved_at
+      FROM complaints c
+      LEFT JOIN complaint_categories cat ON c.category_id = cat.id
+      WHERE ${whereSql}
+      ORDER BY c.created_at DESC, c.id DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [rows] = await pool.query(dataSql, [...queryParams, limitNum, offset]);
+
+    return {
+      complaints: rows,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages
+    };
+  },
+
+  /**
+   * Finds a single complaint by ID ensuring student ownership
+   * Retrieves category name and latest remarks from complaint_status_history
+   * 
+   * @param {object} params
+   * @param {number} params.complaintId
+   * @param {number} params.studentId
+   * @returns {Promise<object|null>}
+   */
+  async findStudentComplaintById({ complaintId, studentId }) {
+    const [rows] = await pool.query(
+      `SELECT c.id, c.ticket_number, c.student_id, c.category_id,
+              cat.name AS category_name,
+              c.title, c.description, c.block_id, c.hostel_block,
+              c.room_number, c.priority, c.status, c.created_at,
+              c.updated_at, c.resolved_at,
+              (
+                SELECT h.remarks
+                FROM complaint_status_history h
+                WHERE h.complaint_id = c.id
+                ORDER BY h.changed_at DESC, h.id DESC
+                LIMIT 1
+              ) AS remarks
+       FROM complaints c
+       LEFT JOIN complaint_categories cat ON c.category_id = cat.id
+       WHERE c.id = ? AND c.student_id = ?
+       LIMIT 1`,
+      [complaintId, studentId]
+    );
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    const complaint = rows[0];
+    complaint.latest_remarks = complaint.remarks;
+    return complaint;
   }
 };
 

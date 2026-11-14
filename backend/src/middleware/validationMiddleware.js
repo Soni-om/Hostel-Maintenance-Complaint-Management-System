@@ -3,7 +3,7 @@
  * Uses express-validator to enforce input schemas, email normalization, and RBAC enrollment rules
  */
 
-import { body, validationResult } from 'express-validator';
+import { body, query, param, validationResult } from 'express-validator';
 import CategoryModel from '../models/categoryModel.js';
 
 /**
@@ -287,6 +287,48 @@ export const validateComplaintCreationRules = [
       }
       return true;
     }),
+
+  handleValidationErrors
+];
+
+/**
+ * Validation rules for Student Complaint Listing (GET /api/complaints/mine)
+ */
+export const validateComplaintListRules = [
+  query('page')
+    .optional({ nullable: true, checkFalsy: true })
+    .isInt({ min: 1 }).withMessage('Page must be a valid positive integer greater than or equal to 1.')
+    .toInt(),
+
+  query('limit')
+    .optional({ nullable: true, checkFalsy: true })
+    .isInt({ min: 1, max: 50 }).withMessage('Limit must be an integer between 1 and 50.')
+    .toInt(),
+
+  query('status')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('Status filter must be a string.')
+    .trim()
+    .toLowerCase()
+    .isIn(['pending', 'assigned', 'in_progress', 'resolved', 'closed'])
+    .withMessage("Invalid status filter. Allowed values: 'pending', 'assigned', 'in_progress', 'resolved', 'closed'."),
+
+  query('category_id')
+    .optional({ nullable: true, checkFalsy: true })
+    .isInt({ min: 1 }).withMessage('Category ID must be a valid positive integer.')
+    .toInt(),
+
+  handleValidationErrors
+];
+
+/**
+ * Validation rules for Single Complaint Details (GET /api/complaints/:id)
+ */
+export const validateComplaintIdRules = [
+  param('id')
+    .notEmpty().withMessage('Complaint ID is required.')
+    .isInt({ min: 1 }).withMessage('Complaint ID must be a valid positive integer.')
+    .toInt(),
 
   handleValidationErrors
 ];

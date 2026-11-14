@@ -88,17 +88,92 @@ Base URL: `http://localhost:5000/api/v1`
   - `403 Forbidden`: Authenticated user is not a student (staff/admin rejected).
   - `503 Service Unavailable`: Daily ticket limit (9999) reached.
 
-### 3.2 List Complaints (Filtered & Paginated)
+### 3.2 List Student Complaints (Filtered & Paginated)
 - **Method:** `GET`
-- **Endpoint:** `/complaints?status=&category=&priority=&search=&page=&limit=`
-- **Access:** Authenticated (Student sees own, Staff sees assigned/domain, Admin sees all)
-- **Success:** `200 OK` $\rightarrow$ `{ success: true, data: [...], pagination: { total, page, limit, totalPages } }`
+- **Endpoints:** `/complaints/mine` and `/complaints` (also `/api/v1/complaints/mine` and `/api/v1/complaints`)
+- **Access:** `Student` only
+- **Query Parameters:**
+  - `page` (optional integer $\ge 1$, default: `1`): Current page number
+  - `limit` (optional integer $1 \le \text{limit} \le 50$, default: `10`): Items per page
+  - `status` (optional string): Filter by complaint status (`pending`, `assigned`, `in_progress`, `resolved`, `closed`)
+  - `category_id` (optional integer $\ge 1$): Filter by complaint category ID
+- **Ordering:** Newest first (`created_at DESC, id DESC`)
+- **Ownership Guarantee:** `c.student_id` is derived strictly from `req.user.id`. Both data selection and total count queries apply identical ownership filtering.
+- **Success:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "complaints": [
+      {
+        "id": 1,
+        "ticket_number": "HC-20261101-0001",
+        "student_id": 5,
+        "category_id": 1,
+        "category_name": "Electrical",
+        "title": "Ceiling fan regulator burnt and sparking",
+        "description": "The speed regulator is sparking...",
+        "block_id": 1,
+        "hostel_block": "Block A",
+        "room_number": "A-102",
+        "priority": "high",
+        "status": "in_progress",
+        "created_at": "2026-11-01T04:45:00.000Z",
+        "updated_at": "2026-11-12T19:05:32.000Z",
+        "resolved_at": null
+      }
+    ],
+    "pagination": {
+      "total": 2,
+      "page": 1,
+      "limit": 10,
+      "totalPages": 1
+    }
+  }
+  ```
+- **Errors:**
+  - `400 Bad Request`: Invalid pagination numbers (`page < 1`, `limit < 1` or `> 50`) or invalid filters (`invalid status`, `category_id < 1`).
+  - `401 Unauthorized`: Missing or invalid Bearer JWT.
+  - `403 Forbidden`: Authenticated user is not a student (staff/admin rejected).
 
-### 3.3 Get Single Complaint Details
+### 3.3 Get Single Complaint Details (Student Owner)
 - **Method:** `GET`
-- **Endpoint:** `/complaints/:id`
-- **Access:** Authenticated (Student owner, Staff, Admin)
-- **Success:** `200 OK` $\rightarrow$ `{ success: true, complaint, history, assignments, feedback }`
+- **Endpoint:** `/complaints/:id` (also `/api/v1/complaints/:id`)
+- **Access:** `Student` (owner only)
+- **Parameters:**
+  - `id` (path parameter, integer $\ge 1$): Primary key ID of the complaint
+- **Ownership & Anti-Enumeration Policy:**
+  - Query enforces `WHERE c.id = ? AND c.student_id = req.user.id`.
+  - Inaccessible complaints (belonging to another resident) and non-existent IDs return an identical `404 Not Found` response with message `"Complaint not found."`. This prevents ID enumeration attacks.
+- **Success:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "complaint": {
+      "id": 1,
+      "ticket_number": "HC-20261101-0001",
+      "student_id": 5,
+      "category_id": 1,
+      "category_name": "Electrical",
+      "title": "Ceiling fan regulator burnt and sparking",
+      "description": "The speed regulator is sparking when turned to speed 3. Smells of burning plastic. Cannot operate fan.",
+      "block_id": 1,
+      "hostel_block": "Block A",
+      "room_number": "A-102",
+      "priority": "high",
+      "status": "in_progress",
+      "created_at": "2026-11-01T04:45:00.000Z",
+      "updated_at": "2026-11-12T19:05:32.000Z",
+      "resolved_at": null,
+      "remarks": "Technician procured replacement regulator from store, inspection underway.",
+      "latest_remarks": "Technician procured replacement regulator from store, inspection underway."
+    }
+  }
+  ```
+- **Errors:**
+  - `400 Bad Request`: `id` is not a positive integer.
+  - `401 Unauthorized`: Missing or invalid Bearer JWT.
+  - `403 Forbidden`: Authenticated user is not a student (staff/admin rejected).
+  - `404 Not Found`: Complaint not found or does not belong to the authenticated student (`{ "success": false, "message": "Complaint not found." }`).
 
 ### 3.4 Assign / Reassign Complaint
 - **Method:** `POST`
