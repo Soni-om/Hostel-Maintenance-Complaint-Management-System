@@ -332,3 +332,99 @@ export const validateComplaintIdRules = [
 
   handleValidationErrors
 ];
+
+/**
+ * Validation rules for Staff Complaint Queue Listing (GET /api/staff/complaints)
+ */
+export const validateStaffComplaintQueryRules = [
+  query('page')
+    .optional({ nullable: true, checkFalsy: true })
+    .isInt({ min: 1 }).withMessage('Page must be a valid positive integer greater than or equal to 1.')
+    .toInt(),
+
+  query('limit')
+    .optional({ nullable: true, checkFalsy: true })
+    .isInt({ min: 1, max: 50 }).withMessage('Limit must be an integer between 1 and 50.')
+    .toInt(),
+
+  query('status')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('Status filter must be a string.')
+    .trim()
+    .toLowerCase()
+    .isIn(['pending', 'assigned', 'in_progress', 'resolved', 'closed'])
+    .withMessage("Invalid status filter. Allowed values: 'pending', 'assigned', 'in_progress', 'resolved', 'closed'."),
+
+  query('category_id')
+    .optional({ nullable: true, checkFalsy: true })
+    .isInt({ min: 1 }).withMessage('Category ID must be a valid positive integer.')
+    .toInt(),
+
+  query('priority')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('Priority filter must be a string.')
+    .trim()
+    .toLowerCase()
+    .isIn(['low', 'normal', 'high', 'urgent'])
+    .withMessage("Invalid priority filter. Allowed values: 'low', 'normal', 'high', 'urgent'."),
+
+  query('keyword')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('Keyword search must be a string.')
+    .trim()
+    .isLength({ max: 100 }).withMessage('Keyword search cannot exceed 100 characters.'),
+
+  query('start_date')
+    .optional({ nullable: true, checkFalsy: true })
+    .trim()
+    .matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('Start date must be in strict YYYY-MM-DD format.')
+    .custom((val) => {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) {
+        throw new Error('Start date must be a valid calendar date.');
+      }
+      return true;
+    }),
+
+  query('end_date')
+    .optional({ nullable: true, checkFalsy: true })
+    .trim()
+    .matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('End date must be in strict YYYY-MM-DD format.')
+    .custom((val, { req }) => {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) {
+        throw new Error('End date must be a valid calendar date.');
+      }
+      if (req.query && req.query.start_date) {
+        const start = new Date(req.query.start_date);
+        if (!isNaN(start.getTime()) && start > d) {
+          throw new Error('Start date cannot be after end date.');
+        }
+      }
+      return true;
+    }),
+
+  query('assigned_to_me')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('assigned_to_me must be a string or boolean representation.')
+    .trim()
+    .toLowerCase()
+    .isIn(['true', 'false', '1', '0']).withMessage("assigned_to_me must be 'true' or 'false'."),
+
+  query('sort_by')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('sort_by must be a string.')
+    .trim()
+    .isIn(['created_at', 'priority', 'status', 'id', 'ticket_number'])
+    .withMessage("Invalid sort_by field. Allowed values: 'created_at', 'priority', 'status', 'id', 'ticket_number'."),
+
+  query('sort_order')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('sort_order must be a string.')
+    .trim()
+    .toLowerCase()
+    .isIn(['asc', 'desc'])
+    .withMessage("Invalid sort_order. Allowed values: 'asc', 'desc'."),
+
+  handleValidationErrors
+];

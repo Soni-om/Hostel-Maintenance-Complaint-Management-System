@@ -155,7 +155,7 @@ const ComplaintController = {
   /**
    * Secure authenticated download/stream of a complaint photo attachment
    * GET /api/complaints/:id/attachments/:attachmentId or /api/complaints/:id/attachment
-   * Access: Student owner, Admin (Staff temporarily restricted pending Phase 3)
+   * Access: Student owner, Permitted Staff (Option D Hybrid Domain/Assignment), Admin
    */
   async downloadAttachment(req, res, next) {
     try {
@@ -169,20 +169,7 @@ const ComplaintController = {
         });
       }
 
-      // 1. Staff access policy enforcement (Finding SEC-11-MED-01 Remediation)
-      // Per RBAC Matrix, Staff access requires ticket assignment and hostel domain authorization.
-      // Because Phase 3 (Sessions 13-14) implements staff assignment and domain queue filtering,
-      // Staff attachment downloads are temporarily restricted to prevent cross-hostel data leakage.
-      // Rejection occurs uniformly without revealing attachment existence (anti-enumeration).
-      if (req.user.role === 'staff') {
-        return res.status(403).json({
-          success: false,
-          code: 'FORBIDDEN_ROLE',
-          message: 'Access denied. Staff attachment downloads are temporarily restricted pending ticket assignment and hostel domain authorization in Phase 3.'
-        });
-      }
-
-      // 2. Fetch attachment record joined with complaint
+      // 1. Fetch attachment record joined with complaint
       const attachment = await ComplaintModel.findAttachment({
         complaintId,
         attachmentId
@@ -195,17 +182,40 @@ const ComplaintController = {
         });
       }
 
-      // 3. Authorization check
-      // If student: must own the complaint (strict anti-enumeration)
-      if (req.user.role === 'student' && attachment.student_id !== req.user.id) {
-        return res.status(404).json({
-          success: false,
-          message: 'Attachment not found.'
-        });
-      }
+      // 2. Authorization check per RBAC Matrix & Option D
+      if (req.user.role === 'student') {
+        // Student: must own the complaint (strict anti-enumeration)
+        if (attachment.student_id !== req.user.id) {
+          return res.status(404).json({
+            success: false,
+            message: 'Attachment not found.'
+          });
+        }
+      } else if (req.user.role === 'staff') {
+        // Staff: Option D Hybrid Domain & Assignment Visibility Policy
+        // Authorized if complaint is within staff member's assigned hostel block OR actively assigned to them
+        const hasBlockAccess = Boolean(
+          req.user.hostel_block &&
+          req.user.hostel_block.trim() &&
+          attachment.hostel_block &&
+          attachment.hostel_block.trim().toLowerCase() === req.user.hostel_block.trim().toLowerCase()
+        );
 
-      // If user is neither student nor admin, deny access
-      if (req.user.role !== 'admin' && req.user.role !== 'student') {
+        let hasActiveAssignment = false;
+        if (!hasBlockAccess) {
+          hasActiveAssignment = await ComplaintModel.isComplaintAssignedToStaff(complaintId, req.user.id);
+        }
+
+        if (!hasBlockAccess && !hasActiveAssignment) {
+          // Anti-enumeration: return 404 so existence of cross-hostel ticket/attachment is never leaked
+          return res.status(404).json({
+            success: false,
+            message: 'Attachment not found.'
+          });
+        }
+      } else if (req.user.role === 'admin') {
+        // Admin: unrestricted access to all complaint attachments
+      } else {
         return res.status(403).json({
           success: false,
           code: 'FORBIDDEN_ROLE',

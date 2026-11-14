@@ -8,6 +8,120 @@
   <link rel="stylesheet" href="/assets/css/variables.css">
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/components.css">
+  <style>
+    .filter-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      background: var(--color-bg-surface);
+      padding: 1.25rem 1.5rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .filter-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .filter-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .filter-label {
+      font-size: var(--font-xs);
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .filter-select,
+    .filter-input {
+      padding: 0.45rem 0.75rem;
+      font-size: var(--font-sm);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-bg);
+      color: var(--color-text-main);
+      min-width: 140px;
+    }
+
+    .filter-input:focus,
+    .filter-select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.15);
+    }
+
+    .search-input-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex: 1;
+      max-width: 520px;
+    }
+
+    .ticket-cell {
+      font-family: monospace;
+      font-weight: 600;
+      color: var(--color-primary);
+    }
+
+    .badge-has-photo {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11px;
+      color: var(--color-text-muted);
+      background: var(--color-bg-muted);
+      padding: 1px 6px;
+      border-radius: var(--radius-sm);
+      margin-left: 6px;
+      vertical-align: middle;
+      text-decoration: none;
+    }
+
+    .badge-has-photo:hover {
+      background: var(--color-border);
+      color: var(--color-text-main);
+    }
+
+    .badge-unassigned {
+      background-color: var(--color-bg-muted);
+      color: var(--color-text-muted);
+      border: 1px dashed var(--color-border);
+    }
+
+    .table td {
+      vertical-align: middle;
+    }
+
+    .checkbox-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: var(--font-sm);
+      font-weight: 600;
+      color: var(--color-text-main);
+      cursor: pointer;
+      user-select: none;
+    }
+  </style>
 </head>
 
 <body>
@@ -33,60 +147,199 @@
     </div>
   </header>
 
-  <main class="container" style="padding-top: 2.5rem; padding-bottom: 3rem;">
+  <main class="container" style="padding-top: 2.5rem; padding-bottom: 3.5rem;">
     <!-- Welcome Header -->
     <div class="flex justify-between items-center" style="margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
       <div>
-        <h1>Hostel Staff Maintenance Operations</h1>
-        <p class="text-muted">Review, prioritize, assign, and update resolution lifecycle of resident complaints.</p>
+        <h1 id="welcome-heading">Hostel Staff Maintenance Operations</h1>
+        <p class="text-muted text-sm">Review, prioritize, assign, and update resolution lifecycle of resident complaints.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="domain-scope-badge" class="badge badge-assigned" style="font-size: var(--font-xs); padding: 6px 12px;">
+          Checking Domain...
+        </span>
+        <button class="btn btn-secondary btn-sm" onclick="loadComplaints()" title="Refresh Maintenance Queue">
+          🔄 Refresh
+        </button>
       </div>
     </div>
 
-    <!-- Quick Metric Cards -->
-    <div class="grid grid-cols-4" style="margin-bottom: 2.5rem;">
+    <!-- Quick Metric Cards (Real DB Statistics) -->
+    <div class="grid grid-cols-4" style="margin-bottom: 2rem;">
       <div class="stat-card">
         <div>
           <div class="stat-label">Assigned to Me</div>
-          <div class="stat-value">0</div>
+          <div class="stat-value" id="stat-assigned">0</div>
         </div>
         <div style="font-size: 2rem;">🛠️</div>
       </div>
       <div class="stat-card">
         <div>
           <div class="stat-label">Pending Review</div>
-          <div class="stat-value" style="color: var(--color-warning);">0</div>
+          <div class="stat-value" id="stat-pending" style="color: var(--color-warning);">0</div>
         </div>
         <div style="font-size: 2rem;">📥</div>
       </div>
       <div class="stat-card">
         <div>
           <div class="stat-label">In Progress</div>
-          <div class="stat-value" style="color: var(--color-primary);">0</div>
+          <div class="stat-value" id="stat-inprogress" style="color: var(--color-primary);">0</div>
         </div>
         <div style="font-size: 2rem;">⚡</div>
       </div>
       <div class="stat-card">
         <div>
-          <div class="stat-label">Resolved This Week</div>
-          <div class="stat-value" style="color: var(--color-success);">0</div>
+          <div class="stat-label">Resolved</div>
+          <div class="stat-value" id="stat-resolved" style="color: var(--color-success);">0</div>
         </div>
         <div style="font-size: 2rem;">🎯</div>
       </div>
     </div>
 
-    <!-- Complaint Assignment Queue -->
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">Maintenance Work Queue</h3>
-        <span class="badge badge-assigned">Staff Role View</span>
+    <!-- Error Alert Banner (Hidden by default) -->
+    <div id="error-alert" class="alert alert-danger" style="display: none; margin-bottom: 1.5rem;">
+      <span id="error-alert-msg">Failed to load complaints.</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadComplaints()" style="margin-left: 1rem;">Retry</button>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="filter-bar">
+      <!-- Search & Assigned-to-me row -->
+      <div class="filter-row">
+        <div class="search-input-group">
+          <input type="text" id="filter-keyword" class="filter-input" style="flex: 1;" placeholder="Search ticket #, title, description, resident, room..." onkeydown="if(event.key==='Enter'){onFilterChange();}">
+          <button class="btn btn-primary btn-sm" onclick="onFilterChange()">
+            🔍 Search
+          </button>
+        </div>
+        <div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="filter-assigned-to-me" onchange="onFilterChange()">
+            <span>Assigned to Me Only</span>
+          </label>
+        </div>
       </div>
-      <div style="text-align: center; padding: 3rem 1rem;">
+
+      <!-- Dropdown filters & Date range row -->
+      <div class="filter-row">
+        <div class="filter-controls">
+          <div class="filter-item">
+            <label for="filter-status" class="filter-label">Status</label>
+            <select id="filter-status" class="filter-select" onchange="onFilterChange()">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="assigned">Assigned</option>
+              <option value="in_progress">In Progress</option>
+              <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+
+          <div class="filter-item">
+            <label for="filter-category" class="filter-label">Category</label>
+            <select id="filter-category" class="filter-select" onchange="onFilterChange()">
+              <option value="">All Categories</option>
+            </select>
+          </div>
+
+          <div class="filter-item">
+            <label for="filter-priority" class="filter-label">Priority</label>
+            <select id="filter-priority" class="filter-select" onchange="onFilterChange()">
+              <option value="">All Priorities</option>
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="normal">Normal</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+
+          <div class="filter-item">
+            <label for="filter-start-date" class="filter-label">Start Date</label>
+            <input type="date" id="filter-start-date" class="filter-input" onchange="onFilterChange()">
+          </div>
+
+          <div class="filter-item">
+            <label for="filter-end-date" class="filter-label">End Date</label>
+            <input type="date" id="filter-end-date" class="filter-input" onchange="onFilterChange()">
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="btn-reset-filters" class="btn btn-secondary btn-sm" onclick="resetFilters()">
+            Reset Filters
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Maintenance Work Queue Card -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div class="card-header flex justify-between items-center" style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--color-border);">
+        <div>
+          <h3 class="card-title" style="margin-bottom: 0.25rem;">Maintenance Work Queue</h3>
+          <p class="text-muted text-xs" style="margin: 0;">Authorized resident tickets filtered by domain and assignment</p>
+        </div>
+        <div>
+          <span id="queue-total-badge" class="badge badge-assigned">0 Tickets</span>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loading-state" style="text-align: center; padding: 3.5rem 1rem;">
+        <div class="spinner spinner-primary" style="margin: 0 auto 1rem;"></div>
+        <p class="text-muted text-sm">Loading maintenance queue...</p>
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-state" style="display: none; text-align: center; padding: 4rem 1.5rem;">
         <div style="font-size: 3rem; margin-bottom: 1rem;">🧰</div>
-        <h3>No active maintenance assignments</h3>
-        <p class="text-muted text-sm" style="max-width: 420px; margin: 0 auto;">
-          The staff complaint handling and status transition workflow (Pending → Assigned → In Progress → Resolved) will
-          be active in Phase 3 (Sessions 10-12).
+        <h3 id="empty-title">No maintenance tickets found</h3>
+        <p id="empty-desc" class="text-muted text-sm" style="max-width: 440px; margin: 0 auto 1.5rem;">
+          No complaints match the current filter and search criteria within your maintenance scope.
         </p>
+        <button class="btn btn-secondary btn-sm" onclick="resetFilters()">
+          Clear Filters
+        </button>
+      </div>
+
+      <!-- Data Table -->
+      <div id="table-container" class="table-responsive" style="display: none;">
+        <table class="table" style="margin-bottom: 0;">
+          <thead>
+            <tr>
+              <th style="width: 140px;">Ticket #</th>
+              <th>Category</th>
+              <th>Issue Title</th>
+              <th>Resident & Room</th>
+              <th style="width: 90px;">Priority</th>
+              <th style="width: 110px;">Status</th>
+              <th>Assigned Staff</th>
+              <th style="width: 130px;">Filed Date</th>
+              <th style="width: 90px; text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="complaints-tbody">
+            <!-- Dynamically populated rows -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination Footer -->
+      <div id="pagination-bar" class="card-footer flex justify-between items-center" style="display: none; padding: 0.85rem 1.25rem; background: var(--color-bg-muted); border-top: 1px solid var(--color-border); flex-wrap: wrap; gap: 0.75rem;">
+        <div id="pagination-info" class="text-sm text-muted">
+          Showing 1 to 10 of 10 tickets
+        </div>
+        <div class="pagination">
+          <button id="btn-prev" class="pagination-btn" onclick="goToPage(currentPage - 1)">
+            ← Previous
+          </button>
+          <span id="pagination-pages" style="font-size: var(--font-sm); font-weight: 500; padding: 0 0.5rem;">
+            Page 1 of 1
+          </span>
+          <button id="btn-next" class="pagination-btn" onclick="goToPage(currentPage + 1)">
+            Next →
+          </button>
+        </div>
       </div>
     </div>
   </main>
@@ -96,11 +349,17 @@
   <script src="/js/utils.js"></script>
   <script src="/js/auth.js"></script>
   <script>
-    // Enforce staff role access control and background profile verification
+    // 1. Role enforcement: Staff maintenance desk
     if (window.Auth) {
       window.Auth.requireAuth(['staff']);
     }
 
+    // 2. State management
+    let currentPage = 1;
+    const PAGE_LIMIT = 10;
+    let totalPages = 1;
+
+    // 3. Backend & DB Health Probe
     async function checkStatus() {
       const dot = document.getElementById('staff-dot');
       const label = document.getElementById('staff-status-label');
@@ -126,13 +385,33 @@
         }
       }
     }
+
+    // 4. Staff Overview & Domain Scope Pill
     async function loadStaffOverview() {
       try {
         const res = await window.Api.get('/staff/overview', { silent: true });
         if (res && res.data) {
           const userEl = document.getElementById('user-display-name');
-          if (userEl && res.data.designation) {
+          const scopeBadge = document.getElementById('domain-scope-badge');
+          const welcomeHeading = document.getElementById('welcome-heading');
+
+          if (userEl) {
             userEl.textContent = `${res.data.staffName} (${res.data.designation})`;
+          }
+          if (welcomeHeading) {
+            welcomeHeading.textContent = `Welcome, ${res.data.staffName.split(' ')[0]}!`;
+          }
+          if (scopeBadge) {
+            if (res.data.role === 'admin') {
+              scopeBadge.textContent = 'Campus-Wide Admin Scope';
+              scopeBadge.className = 'badge badge-inprogress';
+            } else if (res.data.assignedHostel && res.data.assignedHostel !== 'All Blocks') {
+              scopeBadge.textContent = `${res.data.assignedHostel} Domain Scope`;
+              scopeBadge.className = 'badge badge-assigned';
+            } else {
+              scopeBadge.textContent = 'Direct Assignments Scope';
+              scopeBadge.className = 'badge badge-pending';
+            }
           }
         }
       } catch (err) {
@@ -140,9 +419,211 @@
       }
     }
 
+    // 5. Fetch dynamic categories for filter dropdown
+    async function loadCategories() {
+      const select = document.getElementById('filter-category');
+      try {
+        const res = await window.Api.get('/categories');
+        const categories = res.categories || res.data || [];
+
+        select.innerHTML = '<option value="">All Categories</option>';
+        categories.forEach(cat => {
+          const opt = document.createElement('option');
+          opt.value = cat.id;
+          opt.textContent = cat.name;
+          select.appendChild(opt);
+        });
+      } catch (err) {
+        console.error('Failed to load categories filter:', err);
+      }
+    }
+
+    // 6. Fetch complaints list with search, filters, pagination, and real stats
+    async function loadComplaints() {
+      const loadingState = document.getElementById('loading-state');
+      const emptyState = document.getElementById('empty-state');
+      const tableContainer = document.getElementById('table-container');
+      const paginationBar = document.getElementById('pagination-bar');
+      const errorAlert = document.getElementById('error-alert');
+      const tbody = document.getElementById('complaints-tbody');
+
+      errorAlert.style.display = 'none';
+      loadingState.style.display = 'block';
+      emptyState.style.display = 'none';
+      tableContainer.style.display = 'none';
+      paginationBar.style.display = 'none';
+
+      const keyword = document.getElementById('filter-keyword').value.trim();
+      const status = document.getElementById('filter-status').value;
+      const categoryId = document.getElementById('filter-category').value;
+      const priority = document.getElementById('filter-priority').value;
+      const startDate = document.getElementById('filter-start-date').value;
+      const endDate = document.getElementById('filter-end-date').value;
+      const assignedToMe = document.getElementById('filter-assigned-to-me').checked;
+
+      try {
+        const params = new URLSearchParams();
+        params.append('page', currentPage);
+        params.append('limit', PAGE_LIMIT);
+
+        if (keyword) params.append('keyword', keyword);
+        if (status) params.append('status', status);
+        if (categoryId) params.append('category_id', categoryId);
+        if (priority) params.append('priority', priority);
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        if (assignedToMe) params.append('assigned_to_me', 'true');
+
+        const res = await window.Api.get('/staff/complaints?' + params.toString());
+        const complaints = res.complaints || [];
+        const pagination = res.pagination || { total: complaints.length, page: 1, limit: PAGE_LIMIT, totalPages: 1 };
+        const stats = res.stats || {};
+
+        totalPages = pagination.totalPages || 1;
+        currentPage = pagination.page || 1;
+
+        // Update real DB KPI Metric Cards
+        document.getElementById('stat-assigned').textContent = stats.assignedToMe ?? 0;
+        document.getElementById('stat-pending').textContent = stats.pendingReview ?? 0;
+        document.getElementById('stat-inprogress').textContent = stats.inProgress ?? 0;
+        document.getElementById('stat-resolved').textContent = stats.resolved ?? 0;
+
+        // Update queue total badge
+        document.getElementById('queue-total-badge').textContent = `${pagination.total} Tickets`;
+
+        loadingState.style.display = 'none';
+
+        if (complaints.length === 0) {
+          emptyState.style.display = 'block';
+          const emptyTitle = document.getElementById('empty-title');
+          const emptyDesc = document.getElementById('empty-desc');
+
+          const hasFilters = Boolean(keyword || status || categoryId || priority || startDate || endDate || assignedToMe);
+          if (hasFilters) {
+            emptyTitle.textContent = 'No matching tickets found';
+            emptyDesc.textContent = 'No complaints match your active filter and search criteria. Try clearing filters or selecting another view.';
+          } else {
+            emptyTitle.textContent = 'Queue is clean';
+            emptyDesc.textContent = 'There are currently no maintenance tickets in your authorized scope.';
+          }
+          return;
+        }
+
+        // Render table rows
+        tbody.innerHTML = '';
+        complaints.forEach(item => {
+          const tr = document.createElement('tr');
+
+          const ticketSafe = window.Utils.escapeHtml(item.ticket_number || `HC-#${item.id}`);
+          const catSafe = window.Utils.escapeHtml(item.category_name || 'General');
+          const titleSafe = window.Utils.escapeHtml(item.title || 'Untitled');
+          const residentName = window.Utils.escapeHtml(item.student_name || 'Resident');
+          const blockSafe = window.Utils.escapeHtml(item.hostel_block || '-');
+          const roomSafe = window.Utils.escapeHtml(item.room_number || '-');
+          const dateSafe = item.created_at ? window.Utils.formatDate(item.created_at) : '-';
+
+          const priorityBadge = window.Utils.renderPriorityBadge(item.priority || 'normal');
+          const statusBadge = window.Utils.renderStatusBadge(item.status || 'pending');
+
+          // Photo attachment pill
+          const photoIndicator = item.has_attachment && item.attachment_download_url
+            ? `<a href="${item.attachment_download_url}" target="_blank" class="badge-has-photo" title="View attached photo proof">📎 Photo</a>`
+            : '';
+
+          // Assigned staff pill
+          const assignedStaffSafe = item.assigned_staff_name
+            ? `<span style="font-weight: 500; font-size: var(--font-xs);">${window.Utils.escapeHtml(item.assigned_staff_name)}</span>`
+            : `<span class="badge badge-unassigned" style="font-size: 11px;">Unassigned</span>`;
+
+          tr.innerHTML = `
+            <td>
+              <span class="ticket-cell">${ticketSafe}</span>
+            </td>
+            <td>
+              <span style="font-weight: 500;">${catSafe}</span>
+            </td>
+            <td>
+              <div style="font-weight: 500; color: var(--color-text-main);">${titleSafe} ${photoIndicator}</div>
+              <div class="text-xs text-muted" style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${window.Utils.escapeHtml(item.description || '')}
+              </div>
+            </td>
+            <td>
+              <div style="font-weight: 500;">${residentName}</div>
+              <div class="text-xs text-muted">Block ${blockSafe}, Rm ${roomSafe}</div>
+            </td>
+            <td>${priorityBadge}</td>
+            <td>${statusBadge}</td>
+            <td>${assignedStaffSafe}</td>
+            <td class="text-sm text-muted">${dateSafe}</td>
+            <td style="text-align: right;">
+              <button class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.65rem; font-size: var(--font-xs);" onclick="viewComplaintDetails(${item.id})">
+                Details
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        tableContainer.style.display = 'block';
+
+        // Update pagination bar
+        paginationBar.style.display = 'flex';
+        const startIdx = (currentPage - 1) * PAGE_LIMIT + 1;
+        const endIdx = Math.min(startIdx + complaints.length - 1, pagination.total);
+        document.getElementById('pagination-info').textContent =
+          `Showing ${startIdx} to ${endIdx} of ${pagination.total} tickets`;
+        document.getElementById('pagination-pages').textContent =
+          `Page ${currentPage} of ${totalPages}`;
+
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        btnPrev.disabled = (currentPage <= 1);
+        btnNext.disabled = (currentPage >= totalPages);
+
+      } catch (err) {
+        console.error('Failed to load staff complaints:', err);
+        loadingState.style.display = 'none';
+        errorAlert.style.display = 'flex';
+        const errorAlertMsg = document.getElementById('error-alert-msg');
+        errorAlertMsg.textContent = err.message || 'An error occurred while loading complaints.';
+      }
+    }
+
+    // 7. Navigation & Pagination handlers
+    function goToPage(page) {
+      if (page < 1 || page > totalPages) return;
+      currentPage = page;
+      loadComplaints();
+    }
+
+    function onFilterChange() {
+      currentPage = 1;
+      loadComplaints();
+    }
+
+    function resetFilters() {
+      document.getElementById('filter-keyword').value = '';
+      document.getElementById('filter-status').value = '';
+      document.getElementById('filter-category').value = '';
+      document.getElementById('filter-priority').value = '';
+      document.getElementById('filter-start-date').value = '';
+      document.getElementById('filter-end-date').value = '';
+      document.getElementById('filter-assigned-to-me').checked = false;
+      currentPage = 1;
+      loadComplaints();
+    }
+
+    function viewComplaintDetails(complaintId) {
+      window.Utils.showToast(`Complaint #${complaintId} selected. Status transition workflows will be enabled in Session 14.`, 'info');
+    }
+
+    // 8. Lifecycle initialization
     document.addEventListener('DOMContentLoaded', () => {
       checkStatus();
       loadStaffOverview();
+      loadCategories();
+      loadComplaints();
     });
   </script>
 </body>

@@ -80,10 +80,11 @@ async function runSession11Verification() {
     // Retrieve active seed users
     const student1 = await UserModel.findByEmail('rahul.cs23@hostelcare.edu');     // id: 5 (Block A, A-102)
     const student2 = await UserModel.findByEmail('priya.ee24@hostelcare.edu');      // id: 6 (Block B, B-204)
-    const staffUser = await UserModel.findByEmail('rajesh.electrician@hostelcare.edu'); // id: 3
+    const staffUser = await UserModel.findByEmail('rajesh.electrician@hostelcare.edu'); // id: 3 (Block A)
+    const rameshUser = await UserModel.findByEmail('ramesh.plumber@hostelcare.edu');    // id: 4 (Block B)
     const adminUser = await UserModel.findByEmail('admin@hostelcare.edu');              // id: 1
 
-    if (!student1 || !student2 || !staffUser || !adminUser) {
+    if (!student1 || !student2 || !staffUser || !rameshUser || !adminUser) {
       throw new Error('Seed users missing from database. Please verify seeds.sql.');
     }
 
@@ -91,21 +92,32 @@ async function runSession11Verification() {
       id: student1.id,
       email: student1.email,
       role: student1.role,
-      name: student1.name
+      name: student1.name,
+      hostel_block: student1.hostel_block
     });
 
     const student2Token = generateToken({
       id: student2.id,
       email: student2.email,
       role: student2.role,
-      name: student2.name
+      name: student2.name,
+      hostel_block: student2.hostel_block
     });
 
     const staffToken = generateToken({
       id: staffUser.id,
       email: staffUser.email,
       role: staffUser.role,
-      name: staffUser.name
+      name: staffUser.name,
+      hostel_block: staffUser.hostel_block
+    });
+
+    const rameshToken = generateToken({
+      id: rameshUser.id,
+      email: rameshUser.email,
+      role: rameshUser.role,
+      name: rameshUser.name,
+      hostel_block: rameshUser.hostel_block
     });
 
     const adminToken = generateToken({
@@ -476,17 +488,25 @@ async function runSession11Verification() {
     recordTest(16, 'Cross-Student IDOR Defense: Student 2 receives HTTP 404 on Student 1 attachment', t16Pass,
       `HTTP ${res16.status}, message: "${data16?.message}"`);
 
-    // Test 17: Staff Attachment Access Restricted (SEC-11-MED-01 Remediation)
-    // Staff denied attachment download with HTTP 403 FORBIDDEN_ROLE pending Phase 3 assignment & domain scoping
-    const res17 = await fetch(`${baseUrl}${downloadUrl}`, {
+    // Test 17: Staff Attachment Access Authorization per Option D (SEC-11-MED-01 Resolution)
+    // Non-permitted cross-hostel staff (Ramesh, Block B) receives HTTP 404 anti-enumeration.
+    // Permitted hostel staff (Rajesh, Block A) retrieves image stream with HTTP 200.
+    const res17Cross = await fetch(`${baseUrl}${downloadUrl}`, {
+      headers: { 'Authorization': `Bearer ${rameshToken}` }
+    });
+    const data17Cross = await res17Cross.json();
+
+    const res17Permitted = await fetch(`${baseUrl}${downloadUrl}`, {
       headers: { 'Authorization': `Bearer ${staffToken}` }
     });
-    const data17 = await res17.json();
-    const t17Pass = res17.status === 403 &&
-                    data17?.code === 'FORBIDDEN_ROLE' &&
-                    data17?.message.includes('Staff attachment downloads are temporarily restricted');
-    recordTest(17, 'Staff Attachment Download Restriction: Staff receives HTTP 403 FORBIDDEN_ROLE (SEC-11-MED-01)', t17Pass,
-      `HTTP ${res17.status}, code: ${data17?.code}, message: "${data17?.message}"`);
+    const buf17 = Buffer.from(await res17Permitted.arrayBuffer());
+
+    const t17Pass = res17Cross.status === 404 &&
+                    data17Cross?.message === 'Attachment not found.' &&
+                    res17Permitted.status === 200 &&
+                    buf17.length > 0;
+    recordTest(17, 'Staff Attachment Scoping (Option D): Cross-hostel staff denied (404), permitted staff streams photo (200)', t17Pass,
+      `Cross-hostel (Block B) status: ${res17Cross.status}, Permitted (Block A) status: ${res17Permitted.status}, bytes: ${buf17.length}`);
 
     // Test 18: Authorized Admin can view/download ticket attachment (HTTP 200)
     const res18 = await fetch(`${baseUrl}${downloadUrl}`, {

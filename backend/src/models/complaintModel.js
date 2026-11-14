@@ -343,7 +343,7 @@ const ComplaintModel = {
 
   /**
    * Finds an attachment record by complaint ID and optional attachment ID
-   * Joins complaints table to access student_id for authorization verification
+   * Joins complaints table to access student_id and hostel_block for authorization verification
    * 
    * @param {object} params
    * @param {number} params.complaintId
@@ -354,7 +354,7 @@ const ComplaintModel = {
     let sql = `
       SELECT ca.id, ca.complaint_id, ca.storage_key, ca.original_name,
              ca.mime_type, ca.size_bytes, ca.uploaded_at,
-             c.student_id
+             c.student_id, c.hostel_block
       FROM complaint_attachments ca
       INNER JOIN complaints c ON ca.complaint_id = c.id
       WHERE ca.complaint_id = ?
@@ -368,6 +368,308 @@ const ComplaintModel = {
 
     const [rows] = await pool.query(sql, params);
     return rows.length > 0 ? rows[0] : null;
+  },
+
+  /**
+   * Checks if a complaint has an active assignment to a specific staff member
+   * @param {number} complaintId
+   * @param {number} staffId
+   * @returns {Promise<boolean>}
+   */
+  async isComplaintAssignedToStaff(complaintId, staffId) {
+    const [rows] = await pool.query(
+      `SELECT id FROM complaint_assignments
+       WHERE complaint_id = ? AND staff_id = ? AND unassigned_at IS NULL
+       LIMIT 1`,
+      [complaintId, staffId]
+    );
+    return rows.length > 0;
+  },
+
+  /**
+   * Finds paginated complaints for Staff/Admin according to Option D: Hybrid Domain & Assignment Visibility Policy
+   *
+   * @param {object} params
+   * @param {object} params.user Authenticated user object (role, id, hostel_block)
+   * @param {number} [params.page=1]
+   * @param {number} [params.limit=10]
+   * @param {string} [params.keyword]
+   * @param {string} [params.status]
+   * @param {number} [params.categoryId]
+   * @param {string} [params.priority]
+   * @param {string} [params.startDate]
+   * @param {string} [params.endDate]
+   * @param {boolean|string} [params.assignedToMe]
+   * @param {string} [params.sortBy='created_at']
+   * @param {string} [params.sortOrder='desc']
+   * @returns {Promise<{ complaints: Array<object>, total: number, page: number, limit: number, totalPages: number }>}
+   */
+  async findStaffComplaints({
+    user,
+    page = 1,
+    limit = 10,
+    keyword,
+    status,
+    categoryId,
+    priority,
+    startDate,
+    endDate,
+    assignedToMe,
+    sortBy = 'created_at',
+    sortOrder = 'desc'
+  }) {
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+    const offset = (pageNum - 1) * limitNum;
+
+    const whereClauses = [];
+    const queryParams = [];
+
+    // 1. Enforce Option D Hybrid Domain & Assignment Visibility Policy
+    if (user.role === 'admin') {
+      // Admin has unrestricted access across all hostel blocks and assignments
+    } else if (user.role === 'staff') {
+      if (user.hostel_block && user.hostel_block.trim()) {
+        // Staff with assigned block: can view complaints in their block OR actively assigned to them
+        whereClauses.push(`(
+          c.hostel_block = ?
+          OR EXISTS (
+            SELECT 1 FROM complaint_assignments ca_perm
+            WHERE ca_perm.complaint_id = c.id
+              AND ca_perm.staff_id = ?
+              AND ca_perm.unassigned_at IS NULL
+          )
+        )`);
+        queryParams.push(user.hostel_block.trim(), user.id);
+      } else {
+        // NULL hostel_block rule: Staff without an assigned block can only view complaints actively assigned to them
+        whereClauses.push(`EXISTS (
+          SELECT 1 FROM complaint_assignments ca_perm
+          WHERE ca_perm.complaint_id = c.id
+            AND ca_perm.staff_id = ?
+            AND ca_perm.unassigned_at IS NULL
+        )`);
+        queryParams.push(user.id);
+      }
+    } else {
+      // Any other role (e.g. student) has zero visibility through staff model
+      whereClauses.push('1 = 0');
+    }
+
+    // 2. Filter: assigned_to_me
+    const isAssignedToMe = (assignedToMe === true || assignedToMe === 'true' || assignedToMe === '1');
+    if (isAssignedToMe) {
+      whereClauses.push(`EXISTS (
+        SELECT 1 FROM complaint_assignments ca_filter
+        WHERE ca_filter.complaint_id = c.id
+          AND ca_filter.staff_id = ?
+          AND ca_filter.unassigned_at IS NULL
+      )`);
+      queryParams.push(user.id);
+    }
+
+    // 3. Filter: keyword search (ticket_number, title, description, resident name, room_number)
+    if (keyword && keyword.trim()) {
+      const kw = `%${keyword.trim()}%`;
+      whereClauses.push(`(
+        c.ticket_number LIKE ?
+        OR c.title LIKE ?
+        OR c.description LIKE ?
+        OR u.name LIKE ?
+        OR c.room_number LIKE ?
+      )`);
+      queryParams.push(kw, kw, kw, kw, kw);
+    }
+
+    // 4. Filter: status
+    if (status && status.trim()) {
+      whereClauses.push('c.status = ?');
+      queryParams.push(status.trim().toLowerCase());
+    }
+
+    // 5. Filter: category_id
+    if (categoryId && parseInt(categoryId, 10) > 0) {
+      whereClauses.push('c.category_id = ?');
+      queryParams.push(parseInt(categoryId, 10));
+    }
+
+    // 6. Filter: priority
+    if (priority && priority.trim()) {
+      whereClauses.push('c.priority = ?');
+      queryParams.push(priority.trim().toLowerCase());
+    }
+
+    // 7. Filter: date range (created_at)
+    if (startDate && startDate.trim()) {
+      whereClauses.push('c.created_at >= ?');
+      queryParams.push(`${startDate.trim()} 00:00:00`);
+    }
+    if (endDate && endDate.trim()) {
+      whereClauses.push('c.created_at <= ?');
+      queryParams.push(`${endDate.trim()} 23:59:59.999`);
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    // 8. Sorting allowlist map
+    const SORT_COLUMNS = {
+      'created_at': 'c.created_at',
+      'priority': 'c.priority',
+      'status': 'c.status',
+      'id': 'c.id',
+      'ticket_number': 'c.ticket_number'
+    };
+
+    const sortColumn = SORT_COLUMNS[sortBy] || 'c.created_at';
+    const sortDirection = (String(sortOrder).toLowerCase() === 'asc') ? 'ASC' : 'DESC';
+
+    // 9. Count query with identical WHERE conditions (no joins creating duplicate rows)
+    const countSql = `
+      SELECT COUNT(*) AS total
+      FROM complaints c
+      INNER JOIN users u ON c.student_id = u.id
+      LEFT JOIN complaint_categories cat ON c.category_id = cat.id
+      ${whereSql}
+    `;
+    const [countRows] = await pool.query(countSql, queryParams);
+    const total = countRows[0]?.total || 0;
+    const totalPages = Math.ceil(total / limitNum) || 1;
+
+    // 10. Data query with resident details, active staff assignment, and attachment flag
+    const dataSql = `
+      SELECT c.id, c.ticket_number, c.student_id,
+             u.name AS student_name, u.email AS student_email, u.phone AS student_phone,
+             c.category_id, cat.name AS category_name,
+             c.title, c.description, c.block_id, c.hostel_block, c.room_number,
+             c.priority, c.status, c.created_at, c.updated_at, c.resolved_at,
+             (
+               SELECT ca.staff_id
+               FROM complaint_assignments ca
+               WHERE ca.complaint_id = c.id AND ca.unassigned_at IS NULL
+               ORDER BY ca.id DESC
+               LIMIT 1
+             ) AS assigned_staff_id,
+             (
+               SELECT u2.name
+               FROM complaint_assignments ca
+               INNER JOIN users u2 ON ca.staff_id = u2.id
+               WHERE ca.complaint_id = c.id AND ca.unassigned_at IS NULL
+               ORDER BY ca.id DESC
+               LIMIT 1
+             ) AS assigned_staff_name,
+             (
+               SELECT ca.assigned_at
+               FROM complaint_assignments ca
+               WHERE ca.complaint_id = c.id AND ca.unassigned_at IS NULL
+               ORDER BY ca.id DESC
+               LIMIT 1
+             ) AS assigned_at,
+             (
+               SELECT ca.id
+               FROM complaint_attachments ca
+               WHERE ca.complaint_id = c.id
+               LIMIT 1
+             ) AS attachment_id
+      FROM complaints c
+      INNER JOIN users u ON c.student_id = u.id
+      LEFT JOIN complaint_categories cat ON c.category_id = cat.id
+      ${whereSql}
+      ORDER BY ${sortColumn} ${sortDirection}, c.id DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [rows] = await pool.query(dataSql, [...queryParams, limitNum, offset]);
+
+    const formattedComplaints = rows.map((row) => ({
+      ...row,
+      has_attachment: Boolean(row.attachment_id),
+      attachment_download_url: row.attachment_id
+        ? `/api/v1/complaints/${row.id}/attachments/${row.attachment_id}`
+        : null
+    }));
+
+    return {
+      complaints: formattedComplaints,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages
+    };
+  },
+
+  /**
+   * Computes real database statistics respecting Option D visibility for the authenticated user
+   *
+   * @param {object} params
+   * @param {object} params.user Authenticated user object (role, id, hostel_block)
+   * @returns {Promise<{ totalPermitted: number, assignedToMe: number, pendingReview: number, inProgress: number, resolved: number }>}
+   */
+  async getStaffComplaintStats({ user }) {
+    const scopeWhereClauses = [];
+    const scopeParams = [];
+
+    // 1. Enforce Option D Hybrid Domain & Assignment Visibility Policy
+    if (user.role === 'admin') {
+      // Admin sees global scope
+    } else if (user.role === 'staff') {
+      if (user.hostel_block && user.hostel_block.trim()) {
+        scopeWhereClauses.push(`(
+          c.hostel_block = ?
+          OR EXISTS (
+            SELECT 1 FROM complaint_assignments ca_perm
+            WHERE ca_perm.complaint_id = c.id
+              AND ca_perm.staff_id = ?
+              AND ca_perm.unassigned_at IS NULL
+          )
+        )`);
+        scopeParams.push(user.hostel_block.trim(), user.id);
+      } else {
+        scopeWhereClauses.push(`EXISTS (
+          SELECT 1 FROM complaint_assignments ca_perm
+          WHERE ca_perm.complaint_id = c.id
+            AND ca_perm.staff_id = ?
+            AND ca_perm.unassigned_at IS NULL
+        )`);
+        scopeParams.push(user.id);
+      }
+    } else {
+      return {
+        totalPermitted: 0,
+        assignedToMe: 0,
+        pendingReview: 0,
+        inProgress: 0,
+        resolved: 0
+      };
+    }
+
+    const scopeWhereSql = scopeWhereClauses.length > 0 ? `WHERE ${scopeWhereClauses.join(' AND ')}` : '';
+
+    const statsSql = `
+      SELECT
+        COUNT(*) AS totalPermitted,
+        COUNT(CASE WHEN EXISTS (
+          SELECT 1 FROM complaint_assignments ca
+          WHERE ca.complaint_id = c.id
+            AND ca.staff_id = ?
+            AND ca.unassigned_at IS NULL
+        ) THEN 1 END) AS assignedToMe,
+        COUNT(CASE WHEN c.status = 'pending' THEN 1 END) AS pendingReview,
+        COUNT(CASE WHEN c.status = 'in_progress' THEN 1 END) AS inProgress,
+        COUNT(CASE WHEN c.status = 'resolved' THEN 1 END) AS resolved
+      FROM complaints c
+      ${scopeWhereSql}
+    `;
+
+    const [rows] = await pool.query(statsSql, [user.id, ...scopeParams]);
+    const row = rows[0] || {};
+
+    return {
+      totalPermitted: Number(row.totalPermitted || 0),
+      assignedToMe: Number(row.assignedToMe || 0),
+      pendingReview: Number(row.pendingReview || 0),
+      inProgress: Number(row.inProgress || 0),
+      resolved: Number(row.resolved || 0)
+    };
   }
 };
 

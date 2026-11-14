@@ -219,12 +219,15 @@ Base URL: `http://localhost:5000/api/v1`
 ### 3.4 Download Complaint Attachment
 - **Method:** `GET`
 - **Endpoints:** `/complaints/:id/attachments/:attachmentId` and `/complaints/:id/attachment` (also `/api/v1/complaints/:id/attachments/:attachmentId`)
-- **Access:** Authenticated (`Student` owner, `Admin`; `Staff` temporarily restricted)
+- **Access:** Authenticated (`Student` owner, `Staff` within Option D domain/assignment, `Admin`)
 - **Policy & Security:**
   - Enforces `requireAuth`.
   - **Student Access:** Strictly enforced ownership (`attachment.student_id === req.user.id`). Unauthorized cross-student attempts and non-existent IDs return an identical `404 Not Found` response (`{ "success": false, "message": "Attachment not found." }`) to eliminate ID enumeration.
-  - **Admin Access:** Authorized for administrative inspection and auditing across all system tickets.
-  - **Staff Access (Temporary Restriction — SEC-11-MED-01):** Temporarily restricted with HTTP 403 `FORBIDDEN_ROLE` (`{ "success": false, "code": "FORBIDDEN_ROLE", "message": "Access denied. Staff attachment downloads are temporarily restricted pending ticket assignment and hostel domain authorization in Phase 3." }`). Staff access will be re-enabled in Sessions 13–14 once ticket assignment (`complaints.assigned_to`) and hostel block scoping are fully implemented.
+  - **Admin Access:** Authorized for administrative inspection and auditing across all system tickets campus-wide.
+  - **Staff Access (Option D: Hybrid Domain & Assignment Visibility):**
+    - Staff members can access attachments if the complaint belongs to their assigned hostel block (`complaint.hostel_block = req.user.hostel_block`), OR if the complaint has an active assignment to them (`complaint_assignments.staff_id = req.user.id` and `unassigned_at IS NULL`).
+    - Staff accounts with `hostel_block IS NULL` can access only complaints actively assigned to them.
+    - Unauthorized cross-hostel staff attempts return uniform `404 Not Found` (`{ "success": false, "message": "Attachment not found." }`) to eliminate ticket/attachment ID enumeration.
   - Protects against path traversal via strict `resolveSafeStoragePath` root boundary checks.
   - Streams file directly from private directory (`backend/uploads/complaints/`) with security headers.
 - **Headers Sent by Server:**
@@ -236,8 +239,8 @@ Base URL: `http://localhost:5000/api/v1`
 - **Errors:**
   - `400 Bad Request`: Invalid `:id` or `:attachmentId` format.
   - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
-  - `403 Forbidden`: Authenticated user is Staff (`FORBIDDEN_ROLE`, temporarily restricted pending Phase 3 domain authorization) or user with insufficient permissions.
-  - `404 Not Found`: Attachment record does not exist, file missing on disk, or inaccessible complaint (`{ "success": false, "message": "Attachment not found." }`).
+  - `403 Forbidden`: Authenticated user role is not authorized (`FORBIDDEN_ROLE`).
+  - `404 Not Found`: Attachment record does not exist, file missing on disk, or inaccessible complaint under Option D / Student ownership policy (`{ "success": false, "message": "Attachment not found." }`).
 
 ### 3.5 Assign / Reassign Complaint
 - **Method:** `POST`
@@ -323,7 +326,92 @@ Base URL: `http://localhost:5000/api/v1`
 
 ---
 
-## 6. Analytics & Dashboard Statistics APIs
+## 6. Staff Maintenance Desk APIs
+
+### 6.1 Staff Maintenance Overview
+- **Method:** `GET`
+- **Endpoint:** `/staff/overview` (also `/api/v1/staff/overview`)
+- **Access:** `Staff`, `Admin`
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, message, data: { staffName, role, designation, assignedHostel, activeQueueCount } }`
+- **Errors:**
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `403 Forbidden`: Authenticated user is a student (`FORBIDDEN_ROLE`).
+
+### 6.2 Staff Complaints Queue (Search, Multi-Field Filters & Real DB Stats)
+- **Method:** `GET`
+- **Endpoint:** `/staff/complaints` (also `/api/v1/staff/complaints`)
+- **Access:** `Staff`, `Admin` (Students strictly forbidden with HTTP 403 `FORBIDDEN_ROLE`)
+- **Query Parameters:**
+  - `page` (integer $\ge 1$, default: 1): Page number for pagination.
+  - `limit` (integer 1–50, default: 10): Items per page.
+  - `keyword` (string, max 100 chars): Case-insensitive search across `ticket_number`, `title`, `description`, `student_name`, `room_number`.
+  - `status` (string, allowlist: `pending`, `assigned`, `in_progress`, `resolved`, `closed`): Filter by ticket status.
+  - `category_id` (integer $\ge 1$): Filter by complaint category.
+  - `priority` (string, allowlist: `low`, `normal`, `high`, `urgent`): Filter by priority.
+  - `start_date` (string, strict `YYYY-MM-DD`): Beginning of created_at date range.
+  - `end_date` (string, strict `YYYY-MM-DD`): End of created_at date range (inclusive to 23:59:59.999).
+  - `assigned_to_me` (boolean/string: `'true'` / `'false'`): Filter tickets actively assigned to requesting user.
+  - `sort_by` (string, allowlist: `created_at`, `priority`, `status`, `id`, `ticket_number`, default: `created_at`).
+  - `sort_order` (string, allowlist: `asc`, `desc`, default: `desc`).
+- **Authorization & Visibility Policy (Option D: Hybrid Domain & Assignment Visibility):**
+  - **Admin:** Global campus-wide access to all complaints across all blocks.
+  - **Staff:** Authorized to view complaints where `complaint.hostel_block = req.user.hostel_block` OR an active assignment exists (`complaint_assignments.staff_id = req.user.id` and `unassigned_at IS NULL`).
+  - **NULL hostel_block:** Staff with `hostel_block IS NULL` view only complaints actively assigned to them.
+- **Success:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "complaints": [
+      {
+        "id": 1,
+        "ticket_number": "HC-20261101-0001",
+        "student_id": 5,
+        "student_name": "Rahul Sharma",
+        "student_email": "rahul.cs23@hostelcare.edu",
+        "student_phone": "+91 9855006677",
+        "category_id": 1,
+        "category_name": "Electrical",
+        "title": "Ceiling fan regulator burnt and sparking",
+        "description": "The speed regulator is sparking when turned to speed 3...",
+        "block_id": 1,
+        "hostel_block": "Block A",
+        "room_number": "A-102",
+        "priority": "high",
+        "status": "in_progress",
+        "created_at": "2026-11-01T04:45:00.000Z",
+        "updated_at": "2026-11-01T08:50:00.000Z",
+        "resolved_at": null,
+        "assigned_staff_id": 3,
+        "assigned_staff_name": "Rajesh Kumar",
+        "assigned_at": "2026-11-01T05:30:00.000Z",
+        "attachment_id": 1,
+        "has_attachment": true,
+        "attachment_download_url": "/api/v1/complaints/1/attachments/1"
+      }
+    ],
+    "pagination": {
+      "total": 4,
+      "page": 1,
+      "limit": 10,
+      "totalPages": 1
+    },
+    "stats": {
+      "totalPermitted": 4,
+      "assignedToMe": 3,
+      "pendingReview": 1,
+      "inProgress": 1,
+      "resolved": 1
+    }
+  }
+  ```
+- **Errors:**
+  - `400 Bad Request`: Validation failure on query parameters (e.g. invalid status, category, date range, page/limit boundaries, sort column).
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `403 Forbidden`: Authenticated user is a student (`FORBIDDEN_ROLE`).
+
+---
+
+## 7. Analytics & Dashboard Statistics APIs
 
 ### 6.1 Dashboard Overview Metrics
 - **Method:** `GET`

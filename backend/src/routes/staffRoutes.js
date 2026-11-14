@@ -5,6 +5,8 @@
 
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
+import StaffController from '../controllers/staffController.js';
+import { validateStaffComplaintQueryRules } from '../middleware/validationMiddleware.js';
 
 const router = Router();
 
@@ -29,6 +31,18 @@ router.get('/overview', requireRole('staff', 'admin'), (req, res) => {
     }
   });
 });
+
+/**
+ * @route   GET /api/staff/complaints or /api/v1/staff/complaints
+ * @desc    Get paginated maintenance complaints queue with keyword search, multi-field filters, and stats
+ * @access  Staff and Admin only (Students strictly forbidden with HTTP 403)
+ */
+router.get(
+  '/complaints',
+  requireRole('staff', 'admin'),
+  validateStaffComplaintQueryRules,
+  StaffController.getStaffComplaints
+);
 
 export default router;
 
