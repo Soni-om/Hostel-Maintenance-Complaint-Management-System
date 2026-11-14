@@ -14,7 +14,8 @@ import {
   validateComplaintStatusUpdateRules,
   validateComplaintPriorityUpdateRules,
   validateComplaintCloseRules,
-  validateComplaintReopenRules
+  validateComplaintReopenRules,
+  validateSubmitFeedbackRules
 } from '../middleware/validationMiddleware.js';
 import ComplaintController from '../controllers/complaintController.js';
 import StaffController from '../controllers/staffController.js';
@@ -173,6 +174,29 @@ router.get(
   '/:id/history',
   validateComplaintIdRules,
   ComplaintController.getStatusHistory
+);
+
+/**
+ * @route   POST /api/complaints/:id/feedback or /api/v1/complaints/:id/feedback
+ * @desc    Submit student satisfaction feedback and 1-5 rating for a resolved/closed complaint
+ * @access  Student owner only
+ */
+router.post(
+  '/:id/feedback',
+  requireRole('student'),
+  validateSubmitFeedbackRules,
+  ComplaintController.submitFeedback
+);
+
+/**
+ * @route   GET /api/complaints/:id/feedback or /api/v1/complaints/:id/feedback
+ * @desc    Retrieve feedback rating and comments for a complaint
+ * @access  Authenticated (Student owner, Option D Staff, Admin)
+ */
+router.get(
+  '/:id/feedback',
+  validateComplaintIdRules,
+  ComplaintController.getFeedback
 );
 
 export default router;

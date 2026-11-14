@@ -30,7 +30,8 @@
 | **Complaints: Assign** | `POST /api/v1/complaints/:id/assign` | ❌ | ✅ | ✅ | Staff supervisors or Admins only. |
 | **Complaints: Status Update** | `PATCH /api/v1/complaints/:id/status` | ❌ | ✅ | ✅ | Requires valid status lifecycle transition & remarks. |
 | **Complaints: Close** | `PATCH /api/v1/complaints/:id/close` | ✅ | ❌ | ✅ | Student (after satisfaction) or Admin. |
-| **Complaints: Feedback** | `POST /api/v1/complaints/:id/feedback` | ✅ | ❌ | ❌ | Student owner only, once complaint is `Resolved`. |
+| **Complaints: Submit Feedback** | `POST /api/v1/complaints/:id/feedback` | ✅ | ❌ | ❌ | Student owner only, once complaint is `Resolved` or `Closed`. |
+| **Complaints: View Feedback** | `GET /api/v1/complaints/:id/feedback` | ✅ | ✅ | ✅ | Student owner, Option D Staff, Admin. View resolution quality feedback. |
 | **Categories: List** | `GET /api/v1/categories` | ✅ | ✅ | ✅ | Publicly visible to all authenticated roles. |
 | **Categories: Manage** | `POST/PUT/DELETE /api/v1/categories` | ❌ | ❌ | ✅ | Admin only. |
 | **Users: Provision Staff** | `POST /api/v1/users` | ❌ | ❌ | ✅ | Admin only. Controlled `staff` account creation only. Admin creation via API is strictly rejected (400 Bad Request) as Admin accounts are system-seeded. |

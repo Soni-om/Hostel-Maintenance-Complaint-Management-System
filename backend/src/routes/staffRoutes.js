@@ -117,5 +117,17 @@ router.get(
   StaffController.getStatusHistory
 );
 
+/**
+ * @route   GET /api/staff/complaints/:id/feedback or /api/v1/staff/complaints/:id/feedback
+ * @desc    Retrieve feedback rating and comments for a complaint
+ * @access  Staff and Admin only
+ */
+router.get(
+  '/complaints/:id/feedback',
+  requireRole('staff', 'admin'),
+  validateComplaintIdRules,
+  StaffController.getFeedback
+);
+
 export default router;
 

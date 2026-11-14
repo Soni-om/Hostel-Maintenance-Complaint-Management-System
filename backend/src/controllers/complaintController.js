@@ -462,13 +462,116 @@ const ComplaintController = {
         success: true,
         complaint_id: complaintId,
         ticket_number: complaint.ticket_number,
-        history
+        history,
+        timeline: history
       });
     } catch (error) {
       console.error('Get Status History Error:', error);
       return res.status(500).json({
         success: false,
         message: 'An unexpected internal error occurred while retrieving status history.'
+      });
+    }
+  },
+
+  /**
+   * Submits student satisfaction feedback and 1-5 rating for a resolved/closed complaint
+   * POST /api/complaints/:id/feedback or /api/v1/complaints/:id/feedback
+   * Access: Student owner only
+   */
+  async submitFeedback(req, res, next) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+      const studentId = req.user.id;
+      const { rating } = req.body;
+      const comment = (req.body.comment !== undefined ? req.body.comment : req.body.comments) || null;
+
+      const feedback = await ComplaintModel.submitFeedback({
+        complaintId,
+        studentId,
+        rating: parseInt(rating, 10),
+        comment
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Feedback submitted successfully.',
+        feedback
+      });
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          code: error.code || 'FEEDBACK_ERROR',
+          message: error.message
+        });
+      }
+      console.error('Submit Feedback Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while submitting feedback.'
+      });
+    }
+  },
+
+  /**
+   * Retrieves feedback for a specific complaint
+   * GET /api/complaints/:id/feedback or /api/v1/complaints/:id/feedback
+   * Access: Authenticated (Student owner, Option D Staff, Admin)
+   */
+  async getFeedback(req, res, next) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+
+      const complaint = await ComplaintModel.findById(complaintId);
+      if (!complaint) {
+        return res.status(404).json({
+          success: false,
+          message: 'Complaint not found.'
+        });
+      }
+
+      // Authorization guard: Student must own; Staff must have block access or active assignment
+      if (req.user.role === 'student') {
+        if (complaint.student_id !== req.user.id) {
+          return res.status(404).json({
+            success: false,
+            message: 'Complaint not found.'
+          });
+        }
+      } else if (req.user.role === 'staff') {
+        const hasBlockAccess = Boolean(
+          req.user.hostel_block &&
+          req.user.hostel_block.trim() &&
+          complaint.hostel_block &&
+          complaint.hostel_block.trim().toLowerCase() === req.user.hostel_block.trim().toLowerCase()
+        );
+
+        let hasActiveAssignment = false;
+        if (!hasBlockAccess) {
+          hasActiveAssignment = await ComplaintModel.isComplaintAssignedToStaff(complaintId, req.user.id);
+        }
+
+        if (!hasBlockAccess && !hasActiveAssignment) {
+          return res.status(404).json({
+            success: false,
+            message: 'Complaint not found.'
+          });
+        }
+      }
+
+      const feedback = await ComplaintModel.getFeedbackByComplaintId(complaintId);
+
+      return res.status(200).json({
+        success: true,
+        complaint_id: complaintId,
+        feedback
+      });
+    } catch (error) {
+      console.error('Get Feedback Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while retrieving feedback.'
       });
     }
   }

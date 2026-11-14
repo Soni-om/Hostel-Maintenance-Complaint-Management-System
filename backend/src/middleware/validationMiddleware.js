@@ -587,3 +587,45 @@ export const validateComplaintReopenRules = [
 
   handleValidationErrors
 ];
+
+/**
+ * Validation rules for Student Feedback Submission (POST /api/complaints/:id/feedback)
+ */
+export const validateSubmitFeedbackRules = [
+  param('id')
+    .notEmpty().withMessage('Complaint ID is required.')
+    .isInt({ min: 1 }).withMessage('Complaint ID must be a valid positive integer.')
+    .toInt(),
+
+  body('rating')
+    .notEmpty().withMessage('Rating is required.')
+    .isInt({ min: 1, max: 5 }).withMessage('Rating must be an integer between 1 and 5.')
+    .toInt(),
+
+  body('comments')
+    .optional({ nullable: true })
+    .custom((val, { req }) => {
+      const commentVal = val !== undefined ? val : req.body?.comment;
+      if (commentVal !== undefined && commentVal !== null && typeof commentVal !== 'string') {
+        throw new Error('Comments must be a string if provided.');
+      }
+      if (typeof commentVal === 'string' && commentVal.length > 2000) {
+        throw new Error('Comments cannot exceed 2000 characters.');
+      }
+      return true;
+    }),
+
+  body('comment')
+    .optional({ nullable: true })
+    .custom((val, { req }) => {
+      if (val !== undefined && val !== null && typeof val !== 'string') {
+        throw new Error('Comment must be a string if provided.');
+      }
+      if (typeof val === 'string' && val.length > 2000) {
+        throw new Error('Comment cannot exceed 2000 characters.');
+      }
+      return true;
+    }),
+
+  handleValidationErrors
+];

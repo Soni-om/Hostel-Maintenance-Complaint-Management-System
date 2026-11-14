@@ -305,13 +305,68 @@ const StaffController = {
         success: true,
         complaint_id: complaintId,
         ticket_number: complaint.ticket_number,
-        history
+        history,
+        timeline: history
       });
     } catch (error) {
       console.error('Staff getStatusHistory Error:', error);
       return res.status(500).json({
         success: false,
         message: 'An unexpected internal error occurred while retrieving status history.'
+      });
+    }
+  },
+
+  /**
+   * Retrieves student feedback for a complaint
+   * GET /api/staff/complaints/:id/feedback or /api/v1/staff/complaints/:id/feedback
+   * Access: Staff and Admin only
+   */
+  async getFeedback(req, res, next) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+
+      const complaint = await ComplaintModel.findById(complaintId);
+      if (!complaint) {
+        return res.status(404).json({
+          success: false,
+          message: 'Complaint not found.'
+        });
+      }
+
+      if (req.user.role === 'staff') {
+        const hasBlockAccess = Boolean(
+          req.user.hostel_block &&
+          req.user.hostel_block.trim() &&
+          complaint.hostel_block &&
+          complaint.hostel_block.trim().toLowerCase() === req.user.hostel_block.trim().toLowerCase()
+        );
+
+        let hasActiveAssignment = false;
+        if (!hasBlockAccess) {
+          hasActiveAssignment = await ComplaintModel.isComplaintAssignedToStaff(complaintId, req.user.id);
+        }
+
+        if (!hasBlockAccess && !hasActiveAssignment) {
+          return res.status(404).json({
+            success: false,
+            message: 'Complaint not found.'
+          });
+        }
+      }
+
+      const feedback = await ComplaintModel.getFeedbackByComplaintId(complaintId);
+
+      return res.status(200).json({
+        success: true,
+        complaint_id: complaintId,
+        feedback
+      });
+    } catch (error) {
+      console.error('Staff getFeedback Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while retrieving feedback.'
       });
     }
   }

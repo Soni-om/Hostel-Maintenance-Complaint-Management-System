@@ -342,16 +342,30 @@ Base URL: `http://localhost:5000/api/v1`
 
 ### 4.1 Submit Feedback
 - **Method:** `POST`
-- **Endpoint:** `/complaints/:id/feedback`
+- **Endpoint:** `/complaints/:id/feedback` (also `/api/v1/complaints/:id/feedback`)
 - **Access:** `Student` (owner only, complaint must be `Resolved` or `Closed`)
-- **Body:** `{ rating (1-5), comments }`
-- **Success:** `201 Created` $\rightarrow$ `{ success: true, message, feedback }`
+- **Body:** `{ rating: 1..5, comments?: string }`
+- **Validation Rules:**
+  - `rating`: Mandatory integer between 1 and 5.
+  - `comments` / `comment`: Optional string, max 2000 characters.
+  - Ticket Status: Complaint must be in `resolved` or `closed` status. Submissions on `pending`, `assigned`, or `in_progress` tickets return `400 Bad Request` (`COMPLAINT_NOT_ELIGIBLE`).
+  - Idempotency / Duplicate Prevention: Exactly one feedback entry is permitted per complaint (enforced by DB `UNIQUE` constraint). Duplicate submissions return `409 Conflict` (`DUPLICATE_FEEDBACK`).
+- **Success:** `201 Created` $\rightarrow$ `{ success: true, message: 'Feedback submitted successfully.', feedback }`
+- **Errors:**
+  - `400 Bad Request`: Invalid rating, missing rating, or complaint not resolved/closed (`COMPLAINT_NOT_ELIGIBLE`).
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `403 Forbidden`: Non-student role attempting feedback submission (`FORBIDDEN_ROLE`).
+  - `404 Not Found`: Complaint not found or not owned by student (anti-enumeration).
+  - `409 Conflict`: Feedback already recorded for this complaint (`DUPLICATE_FEEDBACK`).
 
 ### 4.2 Get Feedback for Complaint
 - **Method:** `GET`
-- **Endpoint:** `/complaints/:id/feedback`
-- **Access:** Authenticated (Student owner, Staff, Admin)
-- **Success:** `200 OK` $\rightarrow$ `{ success: true, feedback }`
+- **Endpoint:** `/complaints/:id/feedback` (also `/api/staff/complaints/:id/feedback` and `/api/v1/complaints/:id/feedback`)
+- **Access:** Authenticated (Student owner, Option D Staff, Admin)
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, complaint_id, feedback: { id, complaint_id, student_id, student_name, rating, comment, created_at } | null }`
+- **Errors:**
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `404 Not Found`: Complaint not found or unauthorized under Option D/ownership.
 
 ---
 

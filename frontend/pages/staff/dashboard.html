@@ -439,6 +439,9 @@
             <div><strong>Assignee:</strong> <span id="details-assignee"></span></div>
             <div id="details-photo-box"><strong>Photo:</strong> <span id="details-photo-link">None</span></div>
           </div>
+          <div id="details-feedback-box" style="display: none; margin-top: 0.6rem; padding: 0.5rem 0.75rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius-sm); font-size: var(--font-xs);">
+            <strong style="color: #b45309;">⭐ Resident Rating:</strong> <span id="details-feedback-text"></span>
+          </div>
         </div>
 
         <!-- Interactive Actions Grid: Status Transition & Priority -->
@@ -877,6 +880,24 @@
         } else {
           prioritySelect.disabled = false;
         }
+      }
+
+      // Check and display resident feedback if ticket is resolved/closed
+      const fbBox = document.getElementById('details-feedback-box');
+      const fbText = document.getElementById('details-feedback-text');
+      if (fbBox && fbText) {
+        fbBox.style.display = 'none';
+        window.Api.get(`/staff/complaints/${complaintId}/feedback`)
+          .then(fbRes => {
+            if (fbRes && fbRes.feedback) {
+              const stars = '★'.repeat(fbRes.feedback.rating) + '☆'.repeat(Math.max(0, 5 - fbRes.feedback.rating));
+              fbText.textContent = `${stars} (${fbRes.feedback.rating}/5 Stars) — "${fbRes.feedback.comment || 'No comment provided.'}"`;
+              fbBox.style.display = 'block';
+            }
+          })
+          .catch(() => {
+            fbBox.style.display = 'none';
+          });
       }
 
       loadStatusHistory(complaintId);

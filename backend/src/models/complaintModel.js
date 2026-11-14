@@ -338,6 +338,16 @@ const ComplaintModel = {
     delete complaint.attachment_size;
     delete complaint.attachment_uploaded_at;
 
+    // Retrieve post-resolution feedback if submitted
+    const [feedbackRows] = await pool.query(
+      `SELECT f.id, f.complaint_id, f.student_id, f.rating, f.comment, f.created_at
+       FROM feedback f
+       WHERE f.complaint_id = ?
+       LIMIT 1`,
+      [complaintId]
+    );
+    complaint.feedback = feedbackRows.length > 0 ? feedbackRows[0] : null;
+
     return complaint;
   },
 
@@ -1390,8 +1400,15 @@ const ComplaintModel = {
   async getComplaintStatusHistory(complaintId) {
     const [rows] = await pool.query(
       `SELECT h.id, h.complaint_id, h.changed_by,
-              u.name AS changed_by_name, u.role AS changed_by_role, u.staff_designation,
-              h.old_status, h.new_status, h.remarks, h.changed_at
+              u.name AS changed_by_name,
+              u.name AS actor,
+              u.role AS changed_by_role,
+              u.role AS actor_role,
+              u.staff_designation,
+              h.old_status, h.new_status, h.remarks,
+              h.changed_at,
+              h.changed_at AS timestamp,
+              h.changed_at AS created_at
        FROM complaint_status_history h
        LEFT JOIN users u ON h.changed_by = u.id
        WHERE h.complaint_id = ?
@@ -1400,6 +1417,126 @@ const ComplaintModel = {
     );
 
     return rows;
+  },
+
+  /**
+   * Submits post-resolution quality feedback and 1-5 rating for a complaint
+   * Enforces complaint ownership, resolved/closed status eligibility, and duplicate rejection.
+   * Atomically records audit event in complaint_status_history.
+   *
+   * @param {object} params
+   * @param {number} params.complaintId
+   * @param {number} params.studentId
+   * @param {number} params.rating
+   * @param {string|null} [params.comment]
+   * @returns {Promise<object>}
+   */
+  async submitFeedback({ complaintId, studentId, rating, comment }) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Fetch complaint with row-level lock
+      const [complaintRows] = await connection.execute(
+        `SELECT id, ticket_number, student_id, status FROM complaints WHERE id = ? FOR UPDATE`,
+        [complaintId]
+      );
+
+      if (complaintRows.length === 0) {
+        const error = new Error('Complaint not found.');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const complaint = complaintRows[0];
+
+      // 2. Ownership verification: student must be complaint author (uniform 404 anti-enumeration)
+      if (complaint.student_id !== studentId) {
+        const error = new Error('Complaint not found.');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      // 3. Resolution eligibility verification: complaint must be in 'resolved' or 'closed' status
+      if (!['resolved', 'closed'].includes(complaint.status)) {
+        const error = new Error('Feedback can only be submitted for resolved or closed complaints.');
+        error.statusCode = 400;
+        error.code = 'COMPLAINT_NOT_ELIGIBLE';
+        throw error;
+      }
+
+      // 4. Duplicate feedback check: one feedback per complaint
+      const [existingFeedback] = await connection.execute(
+        `SELECT id FROM feedback WHERE complaint_id = ?`,
+        [complaintId]
+      );
+
+      if (existingFeedback.length > 0) {
+        const error = new Error('Feedback has already been submitted for this complaint.');
+        error.statusCode = 409;
+        error.code = 'DUPLICATE_FEEDBACK';
+        throw error;
+      }
+
+      // 5. Clean comment text
+      const cleanComment = (comment && typeof comment === 'string' && comment.trim())
+        ? comment.trim().slice(0, 2000)
+        : null;
+
+      // 6. Insert feedback record into database
+      const [insertResult] = await connection.execute(
+        `INSERT INTO feedback (complaint_id, student_id, rating, comment, created_at)
+         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [complaintId, studentId, rating, cleanComment]
+      );
+
+      const feedbackId = insertResult.insertId;
+
+      // 7. Atomically record feedback submission in complaint_status_history
+      const auditRemark = `Resident submitted satisfaction rating: ${rating}/5 stars.${cleanComment ? ` Comments: "${cleanComment}"` : ''}`;
+      await connection.execute(
+        `INSERT INTO complaint_status_history (
+           complaint_id, changed_by, old_status, new_status, remarks, changed_at
+         ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [complaintId, studentId, complaint.status, complaint.status, auditRemark]
+      );
+
+      await connection.commit();
+
+      return {
+        id: feedbackId,
+        complaint_id: complaintId,
+        student_id: studentId,
+        rating,
+        comment: cleanComment,
+        ticket_number: complaint.ticket_number
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  /**
+   * Retrieves feedback for a specific complaint
+   * @param {number} complaintId
+   * @returns {Promise<object|null>}
+   */
+  async getFeedbackByComplaintId(complaintId) {
+    const [rows] = await pool.query(
+      `SELECT f.id, f.complaint_id, f.student_id,
+              u.name AS student_name,
+              f.rating, f.comment, f.created_at
+       FROM feedback f
+       LEFT JOIN users u ON f.student_id = u.id
+       WHERE f.complaint_id = ?
+       LIMIT 1`,
+      [complaintId]
+    );
+
+    return rows.length > 0 ? rows[0] : null;
   }
 };
 

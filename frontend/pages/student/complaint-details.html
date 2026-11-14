@@ -78,6 +78,99 @@
     .attachment-preview-img:hover {
       transform: scale(1.01);
     }
+
+    /* Chronological Visual Timeline */
+    .timeline-container {
+      position: relative;
+      padding-left: 1.75rem;
+      margin-top: 1rem;
+    }
+    .timeline-container::before {
+      content: '';
+      position: absolute;
+      top: 0.5rem;
+      bottom: 0.5rem;
+      left: 0.65rem;
+      width: 2px;
+      background: var(--color-border);
+    }
+    .timeline-item {
+      position: relative;
+      margin-bottom: 1.25rem;
+    }
+    .timeline-item:last-child {
+      margin-bottom: 0;
+    }
+    .timeline-dot {
+      position: absolute;
+      left: -1.75rem;
+      top: 0.25rem;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      border: 2px solid white;
+      box-shadow: 0 0 0 2px var(--color-border);
+    }
+    .timeline-dot.pending { background: #6b7280; }
+    .timeline-dot.assigned { background: #3b82f6; }
+    .timeline-dot.in_progress { background: #eab308; }
+    .timeline-dot.resolved { background: #16a34a; }
+    .timeline-dot.closed { background: #475569; }
+    .timeline-content {
+      background: var(--color-bg-muted);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      font-size: var(--font-xs);
+    }
+    .timeline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
+    }
+    .timeline-actor {
+      font-weight: 600;
+      color: var(--color-text-main);
+    }
+    .timeline-time {
+      color: var(--color-text-muted);
+    }
+    .timeline-remarks {
+      margin-top: 0.35rem;
+      color: var(--color-text-main);
+      line-height: 1.4;
+      font-style: italic;
+      background: white;
+      padding: 0.4rem 0.6rem;
+      border-radius: 3px;
+      border-left: 2px solid var(--color-primary);
+    }
+
+    /* Star Rating Picker */
+    .star-rating-picker {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .star-btn {
+      background: none;
+      border: none;
+      font-size: 1.75rem;
+      color: #d1d5db;
+      cursor: pointer;
+      padding: 0 2px;
+      transition: color 0.15s ease, transform 0.15s ease;
+      line-height: 1;
+    }
+    .star-btn:hover,
+    .star-btn.active {
+      color: #f59e0b;
+      transform: scale(1.1);
+    }
   </style>
 </head>
 <body>
@@ -166,15 +259,24 @@
           </div>
 
           <!-- Status Remarks & Timeline Card -->
-          <div class="card">
-            <h3 class="card-title" style="margin-bottom: 0.75rem;">Status Timeline & Remarks</h3>
-            <p class="text-muted text-sm" style="margin-bottom: 0.5rem;">
-              Latest administrative response from hostel maintenance staff:
+          <div class="card" id="timeline-card">
+            <div class="flex justify-between items-center" style="margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+              <h3 class="card-title" style="margin-bottom: 0;">Status Timeline & Remarks</h3>
+              <span id="timeline-count-badge" class="badge" style="background: var(--color-bg-muted); color: var(--color-text-muted); font-size: var(--font-xs); font-weight: normal;">0 events</span>
+            </div>
+            <p class="text-muted text-sm" style="margin-bottom: 0.75rem;">
+              Chronological progress and administrative remarks from maintenance staff:
             </p>
-            <div id="remarks-box" class="remarks-card">
+            <div id="remarks-box" class="remarks-card" style="margin-bottom: 1.25rem;">
+              <div style="font-size: var(--font-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-primary); margin-bottom: 0.25rem;">Latest Administrative Update</div>
               <div id="remarks-text" style="font-size: var(--font-sm); color: var(--color-text-main); line-height: 1.5;">
-                No remarks added yet. Awaiting review by hostel administration.
+                Initial complaint filed. Awaiting review and status updates by hostel maintenance staff.
               </div>
+            </div>
+
+            <!-- Chronological Visual Timeline -->
+            <div id="complaint-timeline" class="timeline-container">
+              <div class="text-center text-muted text-xs" style="padding: 1rem;">Loading timeline events...</div>
             </div>
           </div>
 
@@ -216,6 +318,69 @@
                   ⚠️ Failed to load photo preview. Click "Download Photo" above to retrieve the file directly.
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Resident Resolution Feedback Card -->
+          <div id="feedback-card" class="card" style="border-color: var(--color-border);">
+            <div class="flex justify-between items-center" style="margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+              <h3 class="card-title" style="margin-bottom: 0;">Resolution Feedback & Rating</h3>
+              <span id="feedback-status-pill" class="badge" style="font-size: var(--font-xs);">Status</span>
+            </div>
+
+            <!-- State 1: Complaint not yet eligible (pending, assigned, in_progress) -->
+            <div id="feedback-ineligible-state" style="display: none; padding: 1rem; background: var(--color-bg-muted); border-radius: var(--radius-sm); color: var(--color-text-muted); font-size: var(--font-sm); text-align: center;">
+              <span>⏳ Resident feedback can be submitted once maintenance staff marks this ticket as resolved.</span>
+            </div>
+
+            <!-- State 2: Already submitted feedback (Read-only view) -->
+            <div id="feedback-view-state" style="display: none;">
+              <div style="background: #f8fafc; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 1.25rem;">
+                <div class="flex items-center gap-3" style="margin-bottom: 0.75rem;">
+                  <div id="feedback-stars-display" style="font-size: 1.5rem; color: #f59e0b; letter-spacing: 2px;">★★★★★</div>
+                  <span id="feedback-score-text" style="font-weight: 700; font-size: var(--font-base); color: var(--color-text-main);">5 / 5 Stars</span>
+                </div>
+                <div id="feedback-comment-display" style="font-size: var(--font-sm); color: var(--color-text-main); line-height: 1.5; font-style: italic; margin-bottom: 0.75rem; background: white; padding: 0.75rem 1rem; border-radius: var(--radius-sm); border-left: 3px solid #f59e0b;">
+                  No comments provided.
+                </div>
+                <div class="flex justify-between items-center text-xs text-muted">
+                  <span>Verified resident review</span>
+                  <span id="feedback-date-display">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- State 3: Eligible and awaiting feedback submission -->
+            <div id="feedback-form-state" style="display: none;">
+              <p class="text-sm text-muted" style="margin-bottom: 1rem;">
+                Your maintenance ticket has reached resolution. Please rate the repair quality, timeliness, and technician behavior.
+              </p>
+
+              <form id="feedback-form" onsubmit="event.preventDefault(); submitResidentFeedback();">
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                  <label class="info-label" style="display: block; margin-bottom: 0.5rem;">Overall Satisfaction Rating (1 to 5 Stars) *</label>
+                  <div class="star-rating-picker" id="star-picker">
+                    <button type="button" class="star-btn" data-value="1" onclick="setRating(1)" title="1 Star — Poor">★</button>
+                    <button type="button" class="star-btn" data-value="2" onclick="setRating(2)" title="2 Stars — Fair">★</button>
+                    <button type="button" class="star-btn" data-value="3" onclick="setRating(3)" title="3 Stars — Average">★</button>
+                    <button type="button" class="star-btn" data-value="4" onclick="setRating(4)" title="4 Stars — Good">★</button>
+                    <button type="button" class="star-btn" data-value="5" onclick="setRating(5)" title="5 Stars — Excellent">★</button>
+                    <span id="rating-label" style="font-size: var(--font-sm); font-weight: 600; color: var(--color-text-muted); margin-left: 0.75rem;">Click a star to rate</span>
+                  </div>
+                  <input type="hidden" id="selected-rating" value="0" />
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                  <label for="feedback-comments-input" class="info-label" style="display: block; margin-bottom: 0.35rem;">Additional Comments (Optional)</label>
+                  <textarea id="feedback-comments-input" class="form-control" rows="3" maxlength="2000" placeholder="Share your experience regarding repair speed, workmanship, or technician courtesy..."></textarea>
+                </div>
+
+                <div id="feedback-error-alert" class="alert alert-danger" style="display: none; margin-bottom: 1rem; font-size: var(--font-xs);"></div>
+
+                <button type="submit" id="btn-submit-feedback" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px;">
+                  ⭐ Submit Resolution Feedback
+                </button>
+              </form>
             </div>
           </div>
         </div>
@@ -307,7 +472,9 @@
       window.Auth.requireAuth(['student']);
     }
 
-    // 2. Active blob object URL tracking to prevent memory leaks
+    // 2. Active state tracking
+    let currentComplaintId = null;
+    let currentSelectedRating = 0;
     let activeObjectUrl = null;
 
     // 3. User display initialization
@@ -342,6 +509,8 @@
         return;
       }
 
+      currentComplaintId = complaintId;
+
       loadingState.style.display = 'block';
       notfoundCard.style.display = 'none';
       contentView.style.display = 'none';
@@ -357,6 +526,19 @@
         }
 
         renderComplaint(complaint);
+        renderFeedback(complaint);
+
+        // Fetch chronological status history timeline
+        try {
+          const histRes = await window.Api.get('/complaints/' + complaintId + '/history');
+          renderTimeline(histRes.history || []);
+        } catch (histErr) {
+          console.warn('Failed to load status history timeline:', histErr);
+          const tlContainer = document.getElementById('complaint-timeline');
+          if (tlContainer) {
+            tlContainer.innerHTML = '<div class="text-muted text-xs" style="padding: 0.5rem; text-align: center;">Unable to load status history timeline.</div>';
+          }
+        }
 
         loadingState.style.display = 'none';
         contentView.style.display = 'block';
@@ -551,7 +733,199 @@
       }
     }
 
-    // 8. Lifecycle cleanup and initialization
+    // 9. Chronological Status History Timeline Rendering
+    function renderTimeline(history) {
+      const container = document.getElementById('complaint-timeline');
+      const countBadge = document.getElementById('timeline-count-badge');
+      if (!container) return;
+
+      if (countBadge) {
+        countBadge.textContent = `${history.length} ${history.length === 1 ? 'event' : 'events'}`;
+      }
+
+      if (!history || history.length === 0) {
+        container.innerHTML = '<div class="text-muted text-xs" style="padding: 0.75rem; text-align: center;">No timeline events recorded yet.</div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      history.forEach((item) => {
+        const el = document.createElement('div');
+        el.className = 'timeline-item';
+
+        const statusClass = (item.new_status || 'pending').toLowerCase();
+        const actorName = item.actor || item.changed_by_name || 'System';
+        const actorRole = item.actor_role || item.changed_by_role || '';
+        const designation = item.staff_designation ? ` (${item.staff_designation})` : (actorRole ? ` [${actorRole}]` : '');
+        const dateFormatted = item.changed_at
+          ? window.Utils.formatDate(item.changed_at)
+          : (item.timestamp ? window.Utils.formatDate(item.timestamp) : '-');
+
+        const transitionPill = item.old_status
+          ? `<span class="badge" style="font-size: 10px; padding: 2px 6px; background: var(--color-bg-muted); border: 1px solid var(--color-border);">${window.Utils.escapeHtml(item.old_status)} → <strong>${window.Utils.escapeHtml(item.new_status)}</strong></span>`
+          : `<span class="badge" style="font-size: 10px; padding: 2px 6px; background: var(--color-bg-muted); border: 1px solid var(--color-border);"><strong>${window.Utils.escapeHtml(item.new_status)}</strong></span>`;
+
+        let remarksHtml = '';
+        if (item.remarks && item.remarks.trim()) {
+          remarksHtml = `<div class="timeline-remarks">"${window.Utils.escapeHtml(item.remarks.trim())}"</div>`;
+        }
+
+        el.innerHTML = `
+          <div class="timeline-dot ${statusClass}"></div>
+          <div class="timeline-content">
+            <div class="timeline-header">
+              <div>
+                <span class="timeline-actor">${window.Utils.escapeHtml(actorName)}</span>
+                <span class="text-muted" style="font-size: 11px;">${window.Utils.escapeHtml(designation)}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                ${transitionPill}
+                <span class="timeline-time">${dateFormatted}</span>
+              </div>
+            </div>
+            ${remarksHtml}
+          </div>
+        `;
+
+        container.appendChild(el);
+      });
+    }
+
+    // 10. Star Rating Picker & Selection
+    function setRating(val) {
+      currentSelectedRating = val;
+      const ratingHidden = document.getElementById('selected-rating');
+      if (ratingHidden) ratingHidden.value = val;
+
+      const btns = document.querySelectorAll('.star-btn');
+      btns.forEach((btn) => {
+        const btnVal = parseInt(btn.getAttribute('data-value'), 10);
+        if (btnVal <= val) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      const labels = [
+        'Click a star to rate',
+        '1 Star — Poor service quality',
+        '2 Stars — Below expectations',
+        '3 Stars — Average resolution',
+        '4 Stars — Good and prompt work',
+        '5 Stars — Excellent maintenance!'
+      ];
+      const labelEl = document.getElementById('rating-label');
+      if (labelEl) {
+        labelEl.textContent = labels[val] || `${val} Stars`;
+        labelEl.style.color = val > 0 ? '#b45309' : 'var(--color-text-muted)';
+      }
+    }
+
+    // 11. Submit Resident Feedback
+    async function submitResidentFeedback() {
+      const ratingInput = parseInt(document.getElementById('selected-rating').value, 10);
+      const commentsInput = document.getElementById('feedback-comments-input').value.trim();
+      const errorAlert = document.getElementById('feedback-error-alert');
+      const btn = document.getElementById('btn-submit-feedback');
+
+      errorAlert.style.display = 'none';
+
+      if (!ratingInput || ratingInput < 1 || ratingInput > 5) {
+        errorAlert.textContent = 'Please select an overall star rating between 1 and 5.';
+        errorAlert.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Submitting Feedback...';
+
+      try {
+        const res = await window.Api.post(`/complaints/${currentComplaintId}/feedback`, {
+          rating: ratingInput,
+          comments: commentsInput || null
+        });
+
+        window.Utils.showToast(res.message || 'Feedback recorded successfully! Thank you.', 'success');
+        await loadComplaintDetails();
+      } catch (err) {
+        console.error('Submit feedback failed:', err);
+        errorAlert.textContent = err.message || 'Failed to submit feedback. Please try again.';
+        errorAlert.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '⭐ Submit Resolution Feedback';
+      }
+    }
+
+    // 12. Render Resolution Feedback Card State
+    function renderFeedback(complaint) {
+      const card = document.getElementById('feedback-card');
+      const ineligibleState = document.getElementById('feedback-ineligible-state');
+      const viewState = document.getElementById('feedback-view-state');
+      const formState = document.getElementById('feedback-form-state');
+      const statusPill = document.getElementById('feedback-status-pill');
+
+      if (!card) return;
+
+      const isEligible = ['resolved', 'closed'].includes(complaint.status);
+
+      if (!isEligible) {
+        statusPill.textContent = 'Not Eligible Yet';
+        statusPill.style.background = 'var(--color-bg-muted)';
+        statusPill.style.color = 'var(--color-text-muted)';
+        ineligibleState.style.display = 'block';
+        viewState.style.display = 'none';
+        formState.style.display = 'none';
+        return;
+      }
+
+      // If feedback already submitted
+      if (complaint.feedback) {
+        statusPill.textContent = '✓ Feedback Submitted';
+        statusPill.style.background = 'rgba(22, 163, 74, 0.1)';
+        statusPill.style.color = 'var(--color-success)';
+
+        const ratingVal = complaint.feedback.rating || 5;
+        const stars = '★'.repeat(ratingVal) + '☆'.repeat(Math.max(0, 5 - ratingVal));
+        document.getElementById('feedback-stars-display').textContent = stars;
+        document.getElementById('feedback-score-text').textContent = `${ratingVal} / 5 Stars`;
+
+        const commentEl = document.getElementById('feedback-comment-display');
+        if (complaint.feedback.comment && complaint.feedback.comment.trim()) {
+          commentEl.textContent = `"${complaint.feedback.comment.trim()}"`;
+          commentEl.style.display = 'block';
+        } else {
+          commentEl.textContent = 'No additional comments provided.';
+          commentEl.style.display = 'block';
+        }
+
+        document.getElementById('feedback-date-display').textContent = complaint.feedback.created_at
+          ? window.Utils.formatDate(complaint.feedback.created_at)
+          : 'Recently';
+
+        ineligibleState.style.display = 'none';
+        viewState.style.display = 'block';
+        formState.style.display = 'none';
+      } else {
+        // Eligible, not yet submitted
+        statusPill.textContent = 'Awaiting Rating';
+        statusPill.style.background = 'rgba(234, 179, 8, 0.1)';
+        statusPill.style.color = '#b45309';
+
+        ineligibleState.style.display = 'none';
+        viewState.style.display = 'none';
+        formState.style.display = 'block';
+
+        // Reset picker
+        setRating(0);
+        document.getElementById('feedback-comments-input').value = '';
+        document.getElementById('feedback-error-alert').style.display = 'none';
+        document.getElementById('btn-submit-feedback').disabled = false;
+        document.getElementById('btn-submit-feedback').textContent = '⭐ Submit Resolution Feedback';
+      }
+    }
+
+    // 13. Lifecycle cleanup and initialization
     window.addEventListener('beforeunload', () => {
       if (activeObjectUrl) {
         URL.revokeObjectURL(activeObjectUrl);
