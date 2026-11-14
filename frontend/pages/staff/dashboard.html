@@ -344,6 +344,68 @@
     </div>
   </main>
 
+  <!-- Complaint Assignment & History Modal -->
+  <div id="assign-modal" class="modal-backdrop">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="modal-ticket-title">Assign Maintenance Ticket</h3>
+          <p class="text-xs text-muted" id="modal-ticket-subtitle" style="margin: 0;">Delegate issue to an active maintenance staff technician</p>
+        </div>
+        <button style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--color-text-muted); line-height: 1;" onclick="closeAssignModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <!-- Error Alert inside modal -->
+        <div id="modal-error-alert" class="alert alert-danger" style="display: none; margin-bottom: 1rem;">
+          <span id="modal-error-msg"></span>
+        </div>
+
+        <!-- Ticket & Current Assignment Info Card -->
+        <div style="background: var(--color-bg-muted); padding: 0.85rem 1rem; border-radius: var(--radius-md); margin-bottom: 1.25rem; border: 1px solid var(--color-border);">
+          <div class="flex justify-between items-center" style="margin-bottom: 0.35rem;">
+            <span class="text-xs text-muted" style="text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Current Assignee</span>
+            <span id="modal-status-badge"></span>
+          </div>
+          <div id="modal-current-staff" style="font-weight: 600; font-size: var(--font-sm); color: var(--color-text-main);">Unassigned</div>
+          <div id="modal-ticket-summary" class="text-xs text-muted" style="margin-top: 0.25rem;"></div>
+        </div>
+
+        <!-- Assignment Form -->
+        <form id="assign-form" onsubmit="event.preventDefault(); submitAssignment();">
+          <input type="hidden" id="assign-complaint-id">
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="assign-staff-select" class="form-label" style="font-size: var(--font-xs);">Select Maintenance Technician *</label>
+            <select id="assign-staff-select" class="form-select" required>
+              <option value="">-- Choose Active Technician --</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label for="assign-notes-input" class="form-label" style="font-size: var(--font-xs);">Work Notes / Instructions (Optional)</label>
+            <textarea id="assign-notes-input" class="form-textarea" rows="2" placeholder="e.g. Bring spare 20W LED batten and multimeter; inspect wall switchplate..."></textarea>
+          </div>
+
+          <div class="flex justify-end gap-2" style="margin-bottom: 1.5rem;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeAssignModal()">Cancel</button>
+            <button type="submit" id="btn-submit-assignment" class="btn btn-primary btn-sm">Confirm Assignment</button>
+          </div>
+        </form>
+
+        <!-- Chronological Assignment History Section -->
+        <div style="border-top: 1px solid var(--color-border); padding-top: 1.25rem;">
+          <h4 style="font-size: var(--font-sm); font-weight: 700; margin-bottom: 0.75rem; color: var(--color-text-main); display: flex; align-items: center; justify-content: space-between;">
+            <span>📜 Assignment History & Delegation Audit</span>
+            <span id="modal-history-count" class="text-xs text-muted" style="font-weight: normal;">0 records</span>
+          </h4>
+          <div id="assignment-history-list">
+            <div class="text-center text-muted text-xs" style="padding: 1rem;">Loading assignment history...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="/js/config.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/utils.js"></script>
@@ -358,6 +420,8 @@
     let currentPage = 1;
     const PAGE_LIMIT = 10;
     let totalPages = 1;
+    let complaintsListCache = [];
+    let techniciansCache = [];
 
     // 3. Backend & DB Health Probe
     async function checkStatus() {
@@ -476,6 +540,7 @@
 
         const res = await window.Api.get('/staff/complaints?' + params.toString());
         const complaints = res.complaints || [];
+        complaintsListCache = complaints;
         const pagination = res.pagination || { total: complaints.length, page: 1, limit: PAGE_LIMIT, totalPages: 1 };
         const stats = res.stats || {};
 
@@ -557,9 +622,14 @@
             <td>${assignedStaffSafe}</td>
             <td class="text-sm text-muted">${dateSafe}</td>
             <td style="text-align: right;">
-              <button class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.65rem; font-size: var(--font-xs);" onclick="viewComplaintDetails(${item.id})">
-                Details
-              </button>
+              <div class="flex items-center justify-end gap-1">
+                <button class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.65rem; font-size: var(--font-xs);" onclick="viewComplaintDetails(${item.id})">
+                  Details
+                </button>
+                <button class="btn btn-primary btn-sm btn-assign" style="padding: 0.35rem 0.65rem; font-size: var(--font-xs);" onclick="openAssignModal(${item.id})" title="Assign or reassign maintenance technician">
+                  ${item.assigned_staff_name ? 'Reassign' : 'Assign'}
+                </button>
+              </div>
             </td>
           `;
           tbody.appendChild(tr);
@@ -615,14 +685,217 @@
     }
 
     function viewComplaintDetails(complaintId) {
-      window.Utils.showToast(`Complaint #${complaintId} selected. Status transition workflows will be enabled in Session 14.`, 'info');
+      window.Utils.showToast(`Complaint #${complaintId} selected. Status transition workflows will be enabled in Session 15.`, 'info');
     }
 
-    // 8. Lifecycle initialization
+    // 8. Technician Directory & Assignment Modal Workflows
+    async function loadTechnicians() {
+      const select = document.getElementById('assign-staff-select');
+      try {
+        const res = await window.Api.get('/staff/technicians');
+        techniciansCache = res.technicians || [];
+        select.innerHTML = '<option value="">-- Choose Active Technician --</option>';
+        techniciansCache.forEach(tech => {
+          const opt = document.createElement('option');
+          opt.value = tech.id;
+          const blockSuffix = tech.hostel_block ? ` [${tech.hostel_block}]` : ' [General]';
+          opt.textContent = `${tech.name} (${tech.staff_designation || 'Staff'})${blockSuffix}`;
+          select.appendChild(opt);
+        });
+      } catch (err) {
+        console.error('Failed to load technicians:', err);
+        select.innerHTML = '<option value="">Failed to load technicians</option>';
+      }
+    }
+
+    async function loadAssignmentHistory(complaintId) {
+      const container = document.getElementById('assignment-history-list');
+      const countBadge = document.getElementById('modal-history-count');
+      container.innerHTML = '<div class="text-center text-muted text-xs" style="padding: 1rem;">Loading assignment history...</div>';
+
+      try {
+        const res = await window.Api.get(`/staff/complaints/${complaintId}/assignments`);
+        const history = res.assignments || [];
+        countBadge.textContent = `${history.length} ${history.length === 1 ? 'record' : 'records'}`;
+
+        if (history.length === 0) {
+          container.innerHTML = '<div class="text-muted text-xs" style="padding: 0.75rem; text-align: center; background: var(--color-bg-muted); border-radius: var(--radius-sm);">No previous assignments recorded. This ticket is currently unassigned.</div>';
+          return;
+        }
+
+        container.innerHTML = '';
+        history.forEach((item) => {
+          const row = document.createElement('div');
+          row.className = `history-item ${item.is_active ? '' : 'inactive'}`;
+          row.style.cssText = `
+            padding: 0.65rem 0.85rem;
+            border-left: 3px solid ${item.is_active ? 'var(--color-primary)' : 'var(--color-border)'};
+            background: var(--color-bg-muted);
+            margin-bottom: 0.5rem;
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            font-size: var(--font-xs);
+          `;
+
+          const staffSafe = window.Utils.escapeHtml(item.staff_name);
+          const desigSafe = window.Utils.escapeHtml(item.staff_designation || 'Staff');
+          const assignedBySafe = window.Utils.escapeHtml(item.assigned_by_name || 'Supervisor');
+          const assignedAtSafe = item.assigned_at ? window.Utils.formatDate(item.assigned_at) : '—';
+          const unassignedAtSafe = item.unassigned_at ? window.Utils.formatDate(item.unassigned_at) : null;
+          const notesSafe = item.notes ? window.Utils.escapeHtml(item.notes) : null;
+
+          row.innerHTML = `
+            <div class="flex justify-between items-center" style="margin-bottom: 0.25rem;">
+              <span style="font-weight: 600; color: var(--color-text-main);">
+                ${staffSafe} <span class="text-muted" style="font-weight: normal;">(${desigSafe})</span>
+              </span>
+              <span class="badge ${item.is_active ? 'badge-assigned' : 'badge-closed'}" style="font-size: 10px; padding: 1px 6px;">
+                ${item.is_active ? 'Active Assignee' : 'Relieved'}
+              </span>
+            </div>
+            <div class="text-muted" style="font-size: 11px;">
+              Assigned by ${assignedBySafe} on ${assignedAtSafe}
+              ${unassignedAtSafe ? ` · Relieved on ${unassignedAtSafe}` : ''}
+            </div>
+            ${notesSafe ? `<div style="margin-top: 0.35rem; font-style: italic; color: var(--color-text-main); background: rgba(0,0,0,0.03); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm);">"${notesSafe}"</div>` : ''}
+          `;
+          container.appendChild(row);
+        });
+      } catch (err) {
+        console.error('Failed to load assignment history:', err);
+        container.innerHTML = `<div class="text-danger text-xs" style="padding: 0.5rem;">Failed to load assignment history: ${window.Utils.escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    async function openAssignModal(complaintId) {
+      const modal = document.getElementById('assign-modal');
+      const errorAlert = document.getElementById('modal-error-alert');
+      const submitBtn = document.getElementById('btn-submit-assignment');
+
+      errorAlert.style.display = 'none';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Confirm Assignment';
+
+      document.getElementById('assign-complaint-id').value = complaintId;
+      document.getElementById('assign-notes-input').value = '';
+
+      // Look up cached complaint
+      const complaint = complaintsListCache.find(c => c.id === complaintId);
+      const ticketTitle = document.getElementById('modal-ticket-title');
+      const ticketSubtitle = document.getElementById('modal-ticket-subtitle');
+      const ticketSummary = document.getElementById('modal-ticket-summary');
+      const statusBadge = document.getElementById('modal-status-badge');
+      const currentStaffEl = document.getElementById('modal-current-staff');
+
+      if (complaint) {
+        ticketTitle.textContent = `Assign Maintenance Ticket ${complaint.ticket_number || '#' + complaint.id}`;
+        ticketSubtitle.textContent = `${complaint.category_name || 'General'} • Block ${complaint.hostel_block || '-'}, Room ${complaint.room_number || '-'}`;
+        ticketSummary.textContent = `"${complaint.title}" — Filed by ${complaint.student_name || 'Resident'}`;
+        statusBadge.innerHTML = window.Utils.renderStatusBadge(complaint.status || 'pending');
+
+        if (complaint.assigned_staff_name) {
+          currentStaffEl.innerHTML = `<span style="color: var(--color-primary); font-weight: 600;">${window.Utils.escapeHtml(complaint.assigned_staff_name)}</span> <span class="text-muted">(${window.Utils.escapeHtml(complaint.assigned_staff_designation || 'Staff')})</span>`;
+        } else {
+          currentStaffEl.innerHTML = `<span class="badge badge-unassigned" style="font-size: 11px;">Currently Unassigned</span>`;
+        }
+      } else {
+        ticketTitle.textContent = `Assign Maintenance Ticket #${complaintId}`;
+        ticketSubtitle.textContent = 'Delegate issue to an active maintenance staff technician';
+        ticketSummary.textContent = '';
+        statusBadge.innerHTML = '';
+        currentStaffEl.innerHTML = '<span class="text-muted">Unknown</span>';
+      }
+
+      // Ensure technicians dropdown is loaded
+      if (techniciansCache.length === 0) {
+        await loadTechnicians();
+      }
+
+      // Pre-select current staff if assigned
+      const select = document.getElementById('assign-staff-select');
+      if (complaint && complaint.assigned_staff_id) {
+        select.value = String(complaint.assigned_staff_id);
+      } else {
+        select.value = '';
+      }
+
+      // Load chronological assignment history
+      loadAssignmentHistory(complaintId);
+
+      // Show modal
+      modal.classList.add('active');
+    }
+
+    function closeAssignModal() {
+      const modal = document.getElementById('assign-modal');
+      modal.classList.remove('active');
+      document.getElementById('modal-error-alert').style.display = 'none';
+      document.getElementById('assign-form').reset();
+    }
+
+    async function submitAssignment() {
+      const complaintId = parseInt(document.getElementById('assign-complaint-id').value, 10);
+      const staffIdVal = document.getElementById('assign-staff-select').value;
+      const notes = document.getElementById('assign-notes-input').value.trim();
+      const errorAlert = document.getElementById('modal-error-alert');
+      const errorMsg = document.getElementById('modal-error-msg');
+      const submitBtn = document.getElementById('btn-submit-assignment');
+
+      errorAlert.style.display = 'none';
+
+      if (!staffIdVal) {
+        errorAlert.style.display = 'flex';
+        errorMsg.textContent = 'Please select a maintenance technician.';
+        return;
+      }
+
+      const staffId = parseInt(staffIdVal, 10);
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Assigning...';
+
+      try {
+        const payload = {
+          staff_id: staffId,
+          notes: notes || undefined
+        };
+
+        const res = await window.Api.post(`/staff/complaints/${complaintId}/assign`, payload);
+
+        window.Utils.showToast(res.message || 'Complaint assigned successfully!', 'success');
+        closeAssignModal();
+        loadComplaints();
+      } catch (err) {
+        console.error('Failed to submit assignment:', err);
+        errorAlert.style.display = 'flex';
+        errorMsg.textContent = err.message || 'Failed to complete assignment. Please check requirements.';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirm Assignment';
+      }
+    }
+
+    // Modal backdrop click to close
+    document.getElementById('assign-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'assign-modal') {
+        closeAssignModal();
+      }
+    });
+
+    // Escape key to close modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('assign-modal');
+        if (modal && modal.classList.contains('active')) {
+          closeAssignModal();
+        }
+      }
+    });
+
+    // 9. Lifecycle initialization
     document.addEventListener('DOMContentLoaded', () => {
       checkStatus();
       loadStaffOverview();
       loadCategories();
+      loadTechnicians();
       loadComplaints();
     });
   </script>

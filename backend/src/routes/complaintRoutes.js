@@ -9,9 +9,11 @@ import { uploadSinglePhoto } from '../middleware/uploadMiddleware.js';
 import {
   validateComplaintCreationRules,
   validateComplaintListRules,
-  validateComplaintIdRules
+  validateComplaintIdRules,
+  validateComplaintAssignmentRules
 } from '../middleware/validationMiddleware.js';
 import ComplaintController from '../controllers/complaintController.js';
+import StaffController from '../controllers/staffController.js';
 
 const router = Router();
 
@@ -86,6 +88,30 @@ router.get(
 router.get(
   '/:id/attachment',
   ComplaintController.downloadAttachment
+);
+
+/**
+ * @route   POST /api/complaints/:id/assign or /api/v1/complaints/:id/assign
+ * @desc    Assign or reassign a complaint to an active maintenance staff member
+ * @access  Staff and Admin only
+ */
+router.post(
+  '/:id/assign',
+  requireRole('staff', 'admin'),
+  validateComplaintAssignmentRules,
+  StaffController.assignComplaint
+);
+
+/**
+ * @route   GET /api/complaints/:id/assignments or /api/v1/complaints/:id/assignments
+ * @desc    Get chronological assignment history for a complaint
+ * @access  Staff and Admin only
+ */
+router.get(
+  '/:id/assignments',
+  requireRole('staff', 'admin'),
+  validateComplaintIdRules,
+  StaffController.getAssignments
 );
 
 export default router;

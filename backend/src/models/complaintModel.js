@@ -670,6 +670,248 @@ const ComplaintModel = {
       inProgress: Number(row.inProgress || 0),
       resolved: Number(row.resolved || 0)
     };
+  },
+
+  /**
+   * Atomically assigns or reassigns a complaint to an active staff member
+   * - Enforces Option D access control for requesting user
+   * - Verifies complaint exists and is not closed
+   * - Verifies target user is an active maintenance staff account
+   * - Closes previous active assignment (if any) with unassigned_at = CURRENT_TIMESTAMP
+   * - Creates new active assignment record
+   * - Moves pending complaints to 'assigned' status and logs lifecycle status history
+   *
+   * @param {object} params
+   * @param {number} params.complaintId
+   * @param {number} params.staffId
+   * @param {number} params.assignedBy
+   * @param {string|null} [params.notes]
+   * @param {object} params.user Requesting authenticated user (role, id, hostel_block)
+   * @returns {Promise<{ assignment: object, complaint: object }>}
+   */
+  async assignComplaint({ complaintId, staffId, assignedBy, notes = null, user }) {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // 1. Lock and inspect complaint
+      const [complaintRows] = await connection.query(
+        `SELECT c.id, c.ticket_number, c.student_id, c.hostel_block, c.status, c.priority
+         FROM complaints c
+         WHERE c.id = ?
+         FOR UPDATE`,
+        [complaintId]
+      );
+
+      if (complaintRows.length === 0) {
+        const err = new Error('Complaint not found.');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const complaint = complaintRows[0];
+
+      // 2. Enforce Option D Hybrid Domain & Assignment Visibility Policy on complaint
+      if (user.role === 'staff') {
+        const hasBlockAccess = Boolean(
+          user.hostel_block &&
+          user.hostel_block.trim() &&
+          complaint.hostel_block &&
+          complaint.hostel_block.trim().toLowerCase() === user.hostel_block.trim().toLowerCase()
+        );
+
+        let hasActiveAssignment = false;
+        if (!hasBlockAccess) {
+          const [assignmentCheck] = await connection.query(
+            `SELECT id FROM complaint_assignments
+             WHERE complaint_id = ? AND staff_id = ? AND unassigned_at IS NULL
+             LIMIT 1`,
+            [complaintId, user.id]
+          );
+          hasActiveAssignment = assignmentCheck.length > 0;
+        }
+
+        if (!hasBlockAccess && !hasActiveAssignment) {
+          // Anti-enumeration: return 404
+          const err = new Error('Complaint not found.');
+          err.statusCode = 404;
+          throw err;
+        }
+      }
+
+      // 3. Verify complaint lifecycle state
+      if (complaint.status === 'closed') {
+        const err = new Error('Cannot assign a closed complaint. Please reopen the ticket before assigning.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // 4. Verify target user is an active maintenance staff account
+      const [userRows] = await connection.query(
+        `SELECT id, name, email, phone, role, account_status, staff_designation, hostel_block
+         FROM users
+         WHERE id = ?
+         LIMIT 1`,
+        [staffId]
+      );
+
+      if (userRows.length === 0) {
+        const err = new Error('Assigned staff user not found.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      const targetStaff = userRows[0];
+
+      if (targetStaff.role !== 'staff') {
+        const err = new Error(`Invalid assignee: Complaints can only be assigned to active maintenance staff accounts (Target user role: '${targetStaff.role}').`);
+        err.statusCode = 400;
+        throw err;
+      }
+
+      if (targetStaff.account_status !== 'active') {
+        const err = new Error('Cannot assign complaint to an inactive staff member.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // 5. Close previous active assignment if reassigned
+      const [activeAssignments] = await connection.query(
+        `SELECT id, staff_id FROM complaint_assignments
+         WHERE complaint_id = ? AND unassigned_at IS NULL`,
+        [complaintId]
+      );
+
+      let isReassignment = false;
+      let previousStaffId = null;
+
+      if (activeAssignments.length > 0) {
+        isReassignment = true;
+        previousStaffId = activeAssignments[0].staff_id;
+
+        await connection.query(
+          `UPDATE complaint_assignments
+           SET unassigned_at = CURRENT_TIMESTAMP
+           WHERE complaint_id = ? AND unassigned_at IS NULL`,
+          [complaintId]
+        );
+      }
+
+      // 6. Insert new assignment record
+      const [insertResult] = await connection.execute(
+        `INSERT INTO complaint_assignments (
+           complaint_id, staff_id, assigned_by, notes, assigned_at
+         ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [
+          complaintId,
+          staffId,
+          assignedBy,
+          notes && notes.trim() ? notes.trim() : null
+        ]
+      );
+
+      const newAssignmentId = insertResult.insertId;
+
+      // 7. Update status: Move Pending complaints to Assigned when appropriate
+      let newStatus = complaint.status;
+      const previousStatus = complaint.status;
+
+      if (complaint.status === 'pending') {
+        newStatus = 'assigned';
+        await connection.query(
+          `UPDATE complaints SET status = 'assigned' WHERE id = ?`,
+          [complaintId]
+        );
+
+        await connection.execute(
+          `INSERT INTO complaint_status_history (
+             complaint_id, changed_by, old_status, new_status, remarks, changed_at
+           ) VALUES (?, ?, 'pending', 'assigned', ?, CURRENT_TIMESTAMP)`,
+          [
+            complaintId,
+            assignedBy,
+            `Assigned to ${targetStaff.name}${targetStaff.staff_designation ? ` (${targetStaff.staff_designation})` : ''}.${notes && notes.trim() ? ` Notes: ${notes.trim()}` : ''}`
+          ]
+        );
+      } else if (isReassignment) {
+        await connection.execute(
+          `INSERT INTO complaint_status_history (
+             complaint_id, changed_by, old_status, new_status, remarks, changed_at
+           ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+          [
+            complaintId,
+            assignedBy,
+            complaint.status,
+            complaint.status,
+            `Reassigned to ${targetStaff.name}${targetStaff.staff_designation ? ` (${targetStaff.staff_designation})` : ''}.${notes && notes.trim() ? ` Notes: ${notes.trim()}` : ''}`
+          ]
+        );
+      }
+
+      await connection.commit();
+
+      // 8. Fetch complete new assignment details
+      const [assignmentRows] = await pool.query(
+        `SELECT ca.id, ca.complaint_id, ca.staff_id,
+                u.name AS staff_name, u.email AS staff_email, u.phone AS staff_phone, u.staff_designation,
+                ca.assigned_by,
+                u_by.name AS assigned_by_name,
+                ca.notes, ca.assigned_at, ca.unassigned_at,
+                true AS is_active
+         FROM complaint_assignments ca
+         INNER JOIN users u ON ca.staff_id = u.id
+         INNER JOIN users u_by ON ca.assigned_by = u_by.id
+         WHERE ca.id = ?`,
+        [newAssignmentId]
+      );
+
+      return {
+        assignment: {
+          ...assignmentRows[0],
+          is_active: true
+        },
+        complaint: {
+          id: complaintId,
+          ticket_number: complaint.ticket_number,
+          status: newStatus,
+          previous_status: previousStatus,
+          is_reassignment: isReassignment
+        }
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  /**
+   * Retrieves full chronological assignment history for a complaint
+   * @param {number} complaintId
+   * @returns {Promise<Array<object>>}
+   */
+  async getComplaintAssignments(complaintId) {
+    const [rows] = await pool.query(
+      `SELECT ca.id, ca.complaint_id, ca.staff_id,
+              u.name AS staff_name, u.email AS staff_email, u.phone AS staff_phone, u.staff_designation,
+              ca.assigned_by,
+              u_by.name AS assigned_by_name,
+              ca.notes, ca.assigned_at, ca.unassigned_at,
+              (ca.unassigned_at IS NULL) AS is_active
+       FROM complaint_assignments ca
+       INNER JOIN users u ON ca.staff_id = u.id
+       INNER JOIN users u_by ON ca.assigned_by = u_by.id
+       WHERE ca.complaint_id = ?
+       ORDER BY ca.assigned_at ASC, ca.id ASC`,
+      [complaintId]
+    );
+
+    return rows.map((r) => ({
+      ...r,
+      is_active: Boolean(r.is_active)
+    }));
   }
 };
 

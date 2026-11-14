@@ -409,6 +409,130 @@ Base URL: `http://localhost:5000/api/v1`
   - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
   - `403 Forbidden`: Authenticated user is a student (`FORBIDDEN_ROLE`).
 
+### 6.3 Active Maintenance Technicians Directory
+- **Method:** `GET`
+- **Endpoint:** `/staff/technicians` (also `/api/v1/staff/technicians`)
+- **Access:** `Staff`, `Admin` (Students forbidden with HTTP 403 `FORBIDDEN_ROLE`)
+- **Description:** Returns the active maintenance staff technician directory for complaint assignment dropdowns. Excludes student and administrator accounts.
+- **Success:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "technicians": [
+      {
+        "id": 2,
+        "name": "Sunita Sharma",
+        "email": "sunita.supervisor@hostelcare.edu",
+        "phone": "+91 9811002233",
+        "staff_designation": "Hostel Supervisor",
+        "hostel_block": "Block A"
+      },
+      {
+        "id": 3,
+        "name": "Rajesh Kumar",
+        "email": "rajesh.electrician@hostelcare.edu",
+        "phone": "+91 9822003344",
+        "staff_designation": "Senior Electrician",
+        "hostel_block": "Block A"
+      }
+    ]
+  }
+  ```
+- **Errors:**
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `403 Forbidden`: Authenticated user is a student (`FORBIDDEN_ROLE`).
+
+### 6.4 Complaint Assignment and Reassignment
+- **Method:** `POST`
+- **Endpoint:** `/staff/complaints/:id/assign` (also `/complaints/:id/assign` and `/api/v1/staff/complaints/:id/assign`)
+- **Access:** `Staff`, `Admin` (Students forbidden with HTTP 403 `FORBIDDEN_ROLE`)
+- **Body:**
+  ```json
+  {
+    "staff_id": 3,
+    "notes": "Replace defective 20W LED batten in room study area."
+  }
+  ```
+- **Processing & ACID Transaction Contract:**
+  1. Row-level `FOR UPDATE` lock on target complaint row.
+  2. Verifies complaint existence (HTTP 404 if not found).
+  3. Enforces Option D Hybrid Visibility (HTTP 404 anti-enumeration if staff is cross-block and unassigned).
+  4. Rejects closed complaints with HTTP 400 (`Cannot assign a closed complaint`).
+  5. Validates target user: existence, `role === 'staff'` (rejects students with HTTP 400), and `account_status === 'active'` (rejects inactive with HTTP 400).
+  6. Reassignment Handling: If an active assignment exists (`unassigned_at IS NULL`), sets `unassigned_at = CURRENT_TIMESTAMP`.
+  7. Inserts new record in `complaint_assignments` with `assigned_at = CURRENT_TIMESTAMP`.
+  8. Status Transition: Moves `pending` complaints to `assigned` and writes `complaint_status_history` audit record. If already assigned or in_progress, records reassignment remark preserving active status.
+- **Success:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "message": "Complaint assigned successfully to Rajesh Kumar.",
+    "assignment": {
+      "id": 5,
+      "complaint_id": 3,
+      "staff_id": 3,
+      "staff_name": "Rajesh Kumar",
+      "staff_email": "rajesh.electrician@hostelcare.edu",
+      "staff_phone": "+91 9822003344",
+      "staff_designation": "Senior Electrician",
+      "assigned_by": 2,
+      "assigned_by_name": "Sunita Sharma",
+      "notes": "Replace defective 20W LED batten in room study area.",
+      "assigned_at": "2026-11-14T05:30:00.000Z",
+      "unassigned_at": null,
+      "is_active": true
+    },
+    "complaint": {
+      "id": 3,
+      "ticket_number": "HC-20261103-0003",
+      "status": "assigned",
+      "previous_status": "pending",
+      "is_reassignment": false
+    }
+  }
+  ```
+- **Errors:**
+  - `400 Bad Request`: Validation failure on `id`, `staff_id`, or `notes` (> 1000 chars); invalid target user (not found, student role, or inactive); complaint is closed.
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `403 Forbidden`: Authenticated user is a student (`FORBIDDEN_ROLE`).
+  - `404 Not Found`: Complaint not found or Option D anti-enumeration block.
+
+### 6.5 Complaint Assignment History
+- **Method:** `GET`
+- **Endpoint:** `/staff/complaints/:id/assignments` (also `/complaints/:id/assignments` and `/api/v1/staff/complaints/:id/assignments`)
+- **Access:** `Staff`, `Admin` (Students forbidden with HTTP 403 `FORBIDDEN_ROLE`)
+- **Authorization:** Scoped via Option D Hybrid Visibility policy (returns uniform HTTP 404 anti-enumeration for non-permitted cross-hostel attempts).
+- **Success:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "complaint_id": 1,
+    "ticket_number": "HC-20261101-0001",
+    "assignments": [
+      {
+        "id": 1,
+        "complaint_id": 1,
+        "staff_id": 3,
+        "staff_name": "Rajesh Kumar",
+        "staff_email": "rajesh.electrician@hostelcare.edu",
+        "staff_phone": "+91 9822003344",
+        "staff_designation": "Senior Electrician",
+        "assigned_by": 1,
+        "assigned_by_name": "Chief Warden Sharma",
+        "notes": "Inspect switchboard immediately.",
+        "assigned_at": "2026-11-01T05:30:00.000Z",
+        "unassigned_at": null,
+        "is_active": true
+      }
+    ]
+  }
+  ```
+- **Errors:**
+  - `400 Bad Request`: Invalid `:id` parameter format.
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `403 Forbidden`: Authenticated user is a student (`FORBIDDEN_ROLE`).
+  - `404 Not Found`: Complaint not found or Option D anti-enumeration.
+
 ---
 
 ## 7. Analytics & Dashboard Statistics APIs

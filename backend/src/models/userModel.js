@@ -197,6 +197,20 @@ const UserModel = {
   },
 
   /**
+   * Retrieves all active maintenance staff accounts
+   * @returns {Promise<Array<object>>}
+   */
+  async findActiveStaff() {
+    const [rows] = await pool.query(
+      `SELECT id, name, email, phone, role, staff_designation, hostel_block
+       FROM users
+       WHERE role = 'staff' AND account_status = 'active'
+       ORDER BY name ASC`
+    );
+    return rows;
+  },
+
+  /**
    * Permanently deletes a user by ID (Used primarily in automated test teardowns)
    * @param {number} id 
    * @returns {Promise<boolean>}

@@ -6,7 +6,11 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
 import StaffController from '../controllers/staffController.js';
-import { validateStaffComplaintQueryRules } from '../middleware/validationMiddleware.js';
+import {
+  validateStaffComplaintQueryRules,
+  validateComplaintAssignmentRules,
+  validateComplaintIdRules
+} from '../middleware/validationMiddleware.js';
 
 const router = Router();
 
@@ -33,6 +37,13 @@ router.get('/overview', requireRole('staff', 'admin'), (req, res) => {
 });
 
 /**
+ * @route   GET /api/staff/technicians or /api/v1/staff/technicians
+ * @desc    Get active maintenance staff members for ticket assignment
+ * @access  Staff and Admin only
+ */
+router.get('/technicians', requireRole('staff', 'admin'), StaffController.getTechnicians);
+
+/**
  * @route   GET /api/staff/complaints or /api/v1/staff/complaints
  * @desc    Get paginated maintenance complaints queue with keyword search, multi-field filters, and stats
  * @access  Staff and Admin only (Students strictly forbidden with HTTP 403)
@@ -42,6 +53,30 @@ router.get(
   requireRole('staff', 'admin'),
   validateStaffComplaintQueryRules,
   StaffController.getStaffComplaints
+);
+
+/**
+ * @route   POST /api/staff/complaints/:id/assign or /api/v1/staff/complaints/:id/assign
+ * @desc    Assign or reassign a complaint to an active maintenance staff member
+ * @access  Staff and Admin only
+ */
+router.post(
+  '/complaints/:id/assign',
+  requireRole('staff', 'admin'),
+  validateComplaintAssignmentRules,
+  StaffController.assignComplaint
+);
+
+/**
+ * @route   GET /api/staff/complaints/:id/assignments or /api/v1/staff/complaints/:id/assignments
+ * @desc    Get chronological assignment history for a complaint
+ * @access  Staff and Admin only
+ */
+router.get(
+  '/complaints/:id/assignments',
+  requireRole('staff', 'admin'),
+  validateComplaintIdRules,
+  StaffController.getAssignments
 );
 
 export default router;

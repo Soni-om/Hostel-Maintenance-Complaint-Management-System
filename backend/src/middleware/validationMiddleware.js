@@ -428,3 +428,38 @@ export const validateStaffComplaintQueryRules = [
 
   handleValidationErrors
 ];
+
+/**
+ * Validation rules for Complaint Assignment / Reassignment (POST /api/staff/complaints/:id/assign)
+ */
+export const validateComplaintAssignmentRules = [
+  param('id')
+    .notEmpty().withMessage('Complaint ID is required.')
+    .isInt({ min: 1 }).withMessage('Complaint ID must be a valid positive integer.')
+    .toInt(),
+
+  body('staff_id')
+    .custom((val, { req }) => {
+      const staffId = (val !== undefined && val !== null && val !== '')
+        ? val
+        : req.body?.assigned_to_user_id;
+
+      if (staffId === undefined || staffId === null || staffId === '') {
+        throw new Error('staff_id (or assigned_to_user_id) is required.');
+      }
+      const num = parseInt(staffId, 10);
+      if (isNaN(num) || num < 1) {
+        throw new Error('staff_id must be a valid positive integer.');
+      }
+      req.body.staff_id = num;
+      return true;
+    }),
+
+  body('notes')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('Notes must be a string.')
+    .trim()
+    .isLength({ max: 1000 }).withMessage('Notes cannot exceed 1000 characters.'),
+
+  handleValidationErrors
+];

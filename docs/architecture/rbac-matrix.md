@@ -54,7 +54,10 @@
 | `GET` | `/api/v1/users` | Bearer JWT | `admin` | Returns user directory. Never leaks `password_hash`. Paginated. | `200`, `401`, `403` |
 | `PATCH` | `/api/v1/users/:id/status` | Bearer JWT | `admin` | Cannot deactivate own admin account. | `200`, `400`, `401`, `403`, `404` |
 | `GET` | `/api/v1/staff/overview` | Bearer JWT | `staff`, `admin` | Maintenance staff dashboard metrics. Students forbidden (403). | `200`, `401`, `403` |
+| `GET` | `/api/v1/staff/technicians` | Bearer JWT | `staff`, `admin` | Active technicians directory (`role = 'staff'`, `account_status = 'active'`). Excludes students and admin. | `200`, `401`, `403` |
 | `GET` | `/api/v1/staff/complaints` | Bearer JWT | `staff`, `admin` | Option D hybrid visibility. Keyword search, multi-field filters, pagination, and real stats. Students forbidden (403). | `200`, `400`, `401`, `403` |
+| `POST` | `/api/v1/staff/complaints/:id/assign` | Bearer JWT | `staff`, `admin` | Assigns or reassigns complaint. Option D scope. Validates active staff role (rejects students & inactive staff with 400). Atomic ACID transaction, FOR UPDATE lock, moves Pending to Assigned. | `200`, `400`, `401`, `403`, `404` |
+| `GET` | `/api/v1/staff/complaints/:id/assignments` | Bearer JWT | `staff`, `admin` | Chronological assignment history and delegation audit timeline. Option D anti-enumeration (404). | `200`, `400`, `401`, `403`, `404` |
 | `POST` | `/api/v1/complaints` | Bearer JWT | `student` | Students only. Auto-assigned ticket `HC-YYYYMMDD-XXXX`. | `201`, `400`, `401`, `403` |
 | `GET` | `/api/v1/complaints` | Bearer JWT | All Roles | Student sees own tickets; Staff sees domain; Admin sees all. | `200`, `401`, `403` |
 | `GET` | `/api/v1/complaints/:id` | Bearer JWT | All Roles | Student owner only (403 if unowned); Staff/Admin authorized. | `200`, `401`, `403`, `404` |
