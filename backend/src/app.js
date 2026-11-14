@@ -5,6 +5,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import multer from 'multer';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pool, { testConnection } from './config/db.js';
@@ -168,6 +169,43 @@ app.use((err, req, res, next) => {
     return res.status(400).json({
       success: false,
       message: 'Invalid JSON payload received. Request body syntax is malformed.'
+    });
+  }
+
+  // Handle Multer upload errors
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        success: false,
+        code: 'FILE_TOO_LARGE',
+        message: 'File size exceeds maximum permitted limit of 5MB.'
+      });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        success: false,
+        code: 'UNEXPECTED_FILE',
+        message: 'Unexpected file field or too many files. Only a single photo is permitted.'
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      code: err.code,
+      message: err.message || 'File upload error.'
+    });
+  }
+
+  // Handle image validation and format errors (HTTP 415)
+  if (
+    err.statusCode === 415 ||
+    err.code === 'UNSUPPORTED_MEDIA_TYPE' ||
+    err.code === 'INVALID_IMAGE_SIGNATURE' ||
+    err.code === 'CORRUPTED_IMAGE'
+  ) {
+    return res.status(415).json({
+      success: false,
+      code: err.code || 'UNSUPPORTED_MEDIA_TYPE',
+      message: err.message || 'Unsupported or invalid image format. Only JPEG, PNG, and WEBP images are permitted.'
     });
   }
 

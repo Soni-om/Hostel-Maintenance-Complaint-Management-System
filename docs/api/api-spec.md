@@ -68,24 +68,65 @@ Base URL: `http://localhost:5000/api/v1`
 
 ## 3. Complaint Management APIs
 
-### 3.1 Create Complaint
+### 3.1 Create Complaint (With Optional Photo Attachment)
 - **Method:** `POST`
 - **Endpoint:** `/complaints` (also `/api/v1/complaints`)
 - **Access:** `Student` only
-- **Content-Type:** `application/json` *(Photo upload reserved for Session 11)*
-- **Body:** `{ title, description, category_id, room_number? }`
-- **Policy & Security:**
+- **Content-Type:** `application/json` OR `multipart/form-data`
+- **Fields (JSON or Multipart):**
+  - `title` (string, 5–150 chars, required)
+  - `description` (string, 10–2000 chars, required)
+  - `category_id` (integer >= 1, required)
+  - `room_number` (string, optional, must match student's registered room if supplied)
+  - `photo` (file, optional, multipart only): Single image file (JPEG, PNG, WEBP), max 5MB
+- **Policy & Security Pipeline:**
+  - `requireAuth` -> `requireRole('student')` -> Multer in-memory buffer -> Magic byte inspection & Sharp re-encoding -> input validation -> atomic database transaction.
+  - Re-encodes validated images and strips EXIF metadata (clearing GPS, device info, and payload comments).
+  - Unpredictable server-generated filename (`complaint-<timestamp>-<random-hex>.<ext>`) stored in private directory outside public static root.
   - `student_id`, `block_id`, and `hostel_block` derived strictly from authenticated student profile (`req.user`).
   - Client-controlled `priority` is forbidden; defaults to `'normal'`.
   - Rejects attempts to supply privileged fields (`priority`, `status`, `student_id`, `assigned_staff_id`, `ticket_number`, `block_id`, `hostel_block`).
-  - `room_number` is optional in request; falls back to registered `req.user.room_number`. If supplied, must match registered room.
   - Generates unique ticket number `HC-YYYYMMDD-XXXX` in `Asia/Kolkata` (IST) timezone.
-  - Atomically records initial `pending` state transition in `complaint_status_history`.
-- **Success:** `201 Created` $\rightarrow$ `{ success: true, message: 'Complaint lodged successfully.', complaint: { id, ticket_number, student_id, category_id, category_name, title, description, block_id, hostel_block, room_number, priority: 'normal', status: 'pending', created_at, updated_at } }`
+  - Atomically records initial `pending` state transition in `complaint_status_history` and attachment in `complaint_attachments`.
+  - Safe rollback and unlinking: If database operations fail, any staged file is immediately unlinked.
+- **Success:** `201 Created`
+  ```json
+  {
+    "success": true,
+    "message": "Complaint lodged successfully.",
+    "complaint": {
+      "id": 1,
+      "ticket_number": "HC-20261114-0001",
+      "student_id": 5,
+      "category_id": 1,
+      "category_name": "Electrical",
+      "title": "Ceiling fan regulator burnt and sparking",
+      "description": "The speed regulator is sparking when turned to speed 3. Smells of burning plastic. Cannot operate fan.",
+      "block_id": 1,
+      "hostel_block": "Block A",
+      "room_number": "A-102",
+      "priority": "normal",
+      "status": "pending",
+      "created_at": "2026-11-14T07:15:00.000Z",
+      "updated_at": "2026-11-14T07:15:00.000Z",
+      "attachment": {
+        "id": 1,
+        "original_name": "regulator_damage.jpg",
+        "mime_type": "image/jpeg",
+        "size_bytes": 1420580,
+        "uploaded_at": "2026-11-14T07:15:00.000Z",
+        "download_url": "/api/v1/complaints/1/attachments/1"
+      }
+    }
+  }
+  ```
+  *(If no photo was attached, `"attachment": null` is returned).*
 - **Errors:**
-  - `400 Bad Request`: Validation failure, privileged field injection, room mismatch, incomplete profile, or invalid category.
-  - `401 Unauthorized`: Missing or invalid Bearer JWT.
-  - `403 Forbidden`: Authenticated user is not a student (staff/admin rejected).
+  - `400 Bad Request`: Validation failure, privileged field injection, room mismatch, incomplete profile, invalid category, or unexpected file fields (`LIMIT_UNEXPECTED_FILE`).
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `403 Forbidden`: Authenticated user is not a student (staff/admin rejected with `FORBIDDEN_ROLE`).
+  - `413 Payload Too Large`: Uploaded file exceeds 5MB limit (`FILE_TOO_LARGE`).
+  - `415 Unsupported Media Type`: Unsupported format, magic-byte mismatch, or corrupted image (`UNSUPPORTED_MEDIA_TYPE`, `INVALID_IMAGE_SIGNATURE`, `CORRUPTED_IMAGE`).
   - `503 Service Unavailable`: Daily ticket limit (9999) reached.
 
 ### 3.2 List Student Complaints (Filtered & Paginated)
@@ -175,7 +216,28 @@ Base URL: `http://localhost:5000/api/v1`
   - `403 Forbidden`: Authenticated user is not a student (staff/admin rejected).
   - `404 Not Found`: Complaint not found or does not belong to the authenticated student (`{ "success": false, "message": "Complaint not found." }`).
 
-### 3.4 Assign / Reassign Complaint
+### 3.4 Download Complaint Attachment
+- **Method:** `GET`
+- **Endpoints:** `/complaints/:id/attachments/:attachmentId` and `/complaints/:id/attachment` (also `/api/v1/complaints/:id/attachments/:attachmentId`)
+- **Access:** Authenticated (`Student` owner, `Staff`, `Admin`)
+- **Policy & Security:**
+  - Enforces `requireAuth`.
+  - If requester is a Student, ownership is enforced (`complaint.student_id === req.user.id`). Unauthorized cross-student attempts return uniform `404 Not Found` to eliminate ID enumeration.
+  - Staff and Admin are authorized to inspect attachments of complaints across the hostel system.
+  - Protects against path traversal via strict `resolveSafeStoragePath` root boundary checks.
+  - Streams file directly from private directory (`backend/uploads/complaints/`) with security headers.
+- **Headers Sent by Server:**
+  - `Content-Type`: Verified MIME type (`image/jpeg`, `image/png`, `image/webp`)
+  - `Content-Disposition`: `inline; filename="<sanitized_filename>"`
+  - `X-Content-Type-Options`: `nosniff`
+  - `Cache-Control`: `private, no-cache, no-store, must-revalidate`
+- **Success:** `200 OK` (Binary image stream)
+- **Errors:**
+  - `400 Bad Request`: Invalid `:id` or `:attachmentId` format.
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `404 Not Found`: Attachment record does not exist, file missing on disk, or inaccessible complaint (`{ "success": false, "message": "Attachment not found." }`).
+
+### 3.5 Assign / Reassign Complaint
 - **Method:** `POST`
 - **Endpoint:** `/complaints/:id/assign`
 - **Access:** `Staff`, `Admin`

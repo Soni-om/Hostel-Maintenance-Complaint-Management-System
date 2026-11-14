@@ -3,8 +3,16 @@
  * Handles atomic ACID transactions for complaint creation and lifecycle history
  */
 
+import path from 'node:path';
+import fs from 'node:fs';
 import pool from '../config/db.js';
 import { generateNextTicketNumber } from '../utils/ticketGenerator.js';
+import {
+  COMPLAINTS_UPLOAD_DIR,
+  validateAndProcessImage,
+  generateRandomFilename,
+  unlinkFileSafely
+} from '../utils/fileStorage.js';
 
 const MAX_CREATION_RETRIES = 3;
 
@@ -30,12 +38,20 @@ const ComplaintModel = {
     description,
     blockId = null,
     hostelBlock,
-    roomNumber
+    roomNumber,
+    photoFile = null
   }) {
+    // 1. If photoFile is provided, validate & process in memory before acquiring DB connection
+    let processedImage = null;
+    if (photoFile && photoFile.buffer) {
+      processedImage = await validateAndProcessImage(photoFile.buffer, photoFile.originalname);
+    }
+
     let lastError = null;
 
     for (let attempt = 1; attempt <= MAX_CREATION_RETRIES; attempt++) {
       const connection = await pool.getConnection();
+      let writtenFilePath = null;
 
       try {
         await connection.beginTransaction();
@@ -75,10 +91,47 @@ const ComplaintModel = {
           ]
         );
 
-        // 4. Commit atomic transaction
+        let createdAttachment = null;
+
+        // 4. If photo is present, write re-encoded image to disk and record attachment metadata
+        if (processedImage) {
+          const filename = generateRandomFilename(processedImage.extension);
+          const storageKey = `complaints/${filename}`;
+          const absolutePath = path.join(COMPLAINTS_UPLOAD_DIR, filename);
+
+          // Write processed buffer to private uploads directory
+          await fs.promises.writeFile(absolutePath, processedImage.processedBuffer);
+          writtenFilePath = absolutePath;
+
+          const originalSanitizedName = path.basename(photoFile.originalname || `photo${processedImage.extension}`).slice(0, 255);
+
+          const [attachmentResult] = await connection.execute(
+            `INSERT INTO complaint_attachments (
+               complaint_id, storage_key, original_name, mime_type, size_bytes
+             ) VALUES (?, ?, ?, ?, ?)`,
+            [
+              complaintId,
+              storageKey,
+              originalSanitizedName,
+              processedImage.mimeType,
+              processedImage.sizeBytes
+            ]
+          );
+
+          createdAttachment = {
+            id: attachmentResult.insertId,
+            original_name: originalSanitizedName,
+            mime_type: processedImage.mimeType,
+            size_bytes: processedImage.sizeBytes,
+            uploaded_at: new Date().toISOString(),
+            download_url: `/api/v1/complaints/${complaintId}/attachments/${attachmentResult.insertId}`
+          };
+        }
+
+        // 5. Commit atomic transaction
         await connection.commit();
 
-        // 5. Query and return clean complaint details
+        // 6. Query and return clean complaint details
         const [rows] = await connection.query(
           `SELECT c.id, c.ticket_number, c.student_id, c.category_id,
                   cat.name AS category_name,
@@ -90,10 +143,19 @@ const ComplaintModel = {
           [complaintId]
         );
 
-        return rows[0];
+        const complaint = rows[0];
+        complaint.attachment = createdAttachment;
+
+        return complaint;
       } catch (error) {
         await connection.rollback();
         lastError = error;
+
+        // If file was written to disk, safely clean it up to prevent orphaned files
+        if (writtenFilePath) {
+          await unlinkFileSafely(writtenFilePath);
+          writtenFilePath = null;
+        }
 
         // Duplicate-key collision on ticket_number -> retry with fresh transaction
         if ((error.code === 'ER_DUP_ENTRY' || error.errno === 1062) && attempt < MAX_CREATION_RETRIES) {
@@ -236,9 +298,15 @@ const ComplaintModel = {
                 WHERE h.complaint_id = c.id
                 ORDER BY h.changed_at DESC, h.id DESC
                 LIMIT 1
-              ) AS remarks
+              ) AS remarks,
+              ca.id AS attachment_id,
+              ca.original_name AS attachment_name,
+              ca.mime_type AS attachment_mime,
+              ca.size_bytes AS attachment_size,
+              ca.uploaded_at AS attachment_uploaded_at
        FROM complaints c
        LEFT JOIN complaint_categories cat ON c.category_id = cat.id
+       LEFT JOIN complaint_attachments ca ON ca.complaint_id = c.id
        WHERE c.id = ? AND c.student_id = ?
        LIMIT 1`,
       [complaintId, studentId]
@@ -250,7 +318,56 @@ const ComplaintModel = {
 
     const complaint = rows[0];
     complaint.latest_remarks = complaint.remarks;
+
+    if (complaint.attachment_id) {
+      complaint.attachment = {
+        id: complaint.attachment_id,
+        original_name: complaint.attachment_name,
+        mime_type: complaint.attachment_mime,
+        size_bytes: Number(complaint.attachment_size),
+        uploaded_at: complaint.attachment_uploaded_at,
+        download_url: `/api/v1/complaints/${complaint.id}/attachments/${complaint.attachment_id}`
+      };
+    } else {
+      complaint.attachment = null;
+    }
+
+    delete complaint.attachment_id;
+    delete complaint.attachment_name;
+    delete complaint.attachment_mime;
+    delete complaint.attachment_size;
+    delete complaint.attachment_uploaded_at;
+
     return complaint;
+  },
+
+  /**
+   * Finds an attachment record by complaint ID and optional attachment ID
+   * Joins complaints table to access student_id for authorization verification
+   * 
+   * @param {object} params
+   * @param {number} params.complaintId
+   * @param {number|null} [params.attachmentId]
+   * @returns {Promise<object|null>}
+   */
+  async findAttachment({ complaintId, attachmentId = null }) {
+    let sql = `
+      SELECT ca.id, ca.complaint_id, ca.storage_key, ca.original_name,
+             ca.mime_type, ca.size_bytes, ca.uploaded_at,
+             c.student_id
+      FROM complaint_attachments ca
+      INNER JOIN complaints c ON ca.complaint_id = c.id
+      WHERE ca.complaint_id = ?
+    `;
+    const params = [complaintId];
+    if (attachmentId) {
+      sql += ' AND ca.id = ?';
+      params.push(attachmentId);
+    }
+    sql += ' LIMIT 1';
+
+    const [rows] = await pool.query(sql, params);
+    return rows.length > 0 ? rows[0] : null;
   }
 };
 

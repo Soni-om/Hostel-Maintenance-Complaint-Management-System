@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
+import { uploadSinglePhoto } from '../middleware/uploadMiddleware.js';
 import {
   validateComplaintCreationRules,
   validateComplaintListRules,
@@ -19,12 +20,14 @@ router.use(requireAuth);
 
 /**
  * @route   POST /api/complaints or /api/v1/complaints
- * @desc    Lodge a new maintenance complaint ticket
+ * @desc    Lodge a new maintenance complaint ticket with optional photo attachment
  * @access  Student only
+ * @pipeline requireAuth -> requireRole('student') -> upload.single('photo') -> validation -> controller
  */
 router.post(
   '/',
   requireRole('student'),
+  uploadSinglePhoto,
   validateComplaintCreationRules,
   ComplaintController.createComplaint
 );
@@ -63,6 +66,26 @@ router.get(
   requireRole('student'),
   validateComplaintIdRules,
   ComplaintController.getStudentComplaintById
+);
+
+/**
+ * @route   GET /api/complaints/:id/attachments/:attachmentId or /api/v1/...
+ * @desc    Download / stream complaint attachment photograph
+ * @access  Authenticated (Student owner, Staff, Admin)
+ */
+router.get(
+  '/:id/attachments/:attachmentId',
+  ComplaintController.downloadAttachment
+);
+
+/**
+ * @route   GET /api/complaints/:id/attachment or /api/v1/...
+ * @desc    Download / stream complaint attachment photograph (alias)
+ * @access  Authenticated (Student owner, Staff, Admin)
+ */
+router.get(
+  '/:id/attachment',
+  ComplaintController.downloadAttachment
 );
 
 export default router;
