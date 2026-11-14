@@ -70,11 +70,23 @@ Base URL: `http://localhost:5000/api/v1`
 
 ### 3.1 Create Complaint
 - **Method:** `POST`
-- **Endpoint:** `/complaints`
-- **Access:** `Student`
-- **Content-Type:** `multipart/form-data`
-- **Body:** `{ title, description, category_id, priority, room_number, hostel_block, photo }`
-- **Success:** `201 Created` $\rightarrow$ `{ success: true, message, complaint: { ticket_number, ... } }`
+- **Endpoint:** `/complaints` (also `/api/v1/complaints`)
+- **Access:** `Student` only
+- **Content-Type:** `application/json` *(Photo upload reserved for Session 11)*
+- **Body:** `{ title, description, category_id, room_number? }`
+- **Policy & Security:**
+  - `student_id`, `block_id`, and `hostel_block` derived strictly from authenticated student profile (`req.user`).
+  - Client-controlled `priority` is forbidden; defaults to `'normal'`.
+  - Rejects attempts to supply privileged fields (`priority`, `status`, `student_id`, `assigned_staff_id`, `ticket_number`, `block_id`, `hostel_block`).
+  - `room_number` is optional in request; falls back to registered `req.user.room_number`. If supplied, must match registered room.
+  - Generates unique ticket number `HC-YYYYMMDD-XXXX` in `Asia/Kolkata` (IST) timezone.
+  - Atomically records initial `pending` state transition in `complaint_status_history`.
+- **Success:** `201 Created` $\rightarrow$ `{ success: true, message: 'Complaint lodged successfully.', complaint: { id, ticket_number, student_id, category_id, category_name, title, description, block_id, hostel_block, room_number, priority: 'normal', status: 'pending', created_at, updated_at } }`
+- **Errors:**
+  - `400 Bad Request`: Validation failure, privileged field injection, room mismatch, incomplete profile, or invalid category.
+  - `401 Unauthorized`: Missing or invalid Bearer JWT.
+  - `403 Forbidden`: Authenticated user is not a student (staff/admin rejected).
+  - `503 Service Unavailable`: Daily ticket limit (9999) reached.
 
 ### 3.2 List Complaints (Filtered & Paginated)
 - **Method:** `GET`

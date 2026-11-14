@@ -11,6 +11,8 @@ import pool, { testConnection } from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js';
+import complaintRoutes from './routes/complaintRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -138,6 +140,14 @@ app.use(`${apiPrefix}/users`, userRoutes);
 // Staff Operations & Maintenance Queue (Staff & Admin only)
 app.use('/api/staff', staffRoutes);
 app.use(`${apiPrefix}/staff`, staffRoutes);
+
+// Complaint Categories Master (Student, Staff, Admin)
+app.use('/api/categories', categoryRoutes);
+app.use(`${apiPrefix}/categories`, categoryRoutes);
+
+// Maintenance Complaints (Student submission)
+app.use('/api/complaints', complaintRoutes);
+app.use(`${apiPrefix}/complaints`, complaintRoutes);
 
 // ==========================================
 // 5. Centralized 404 Route Handler
