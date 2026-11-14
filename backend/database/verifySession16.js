@@ -1093,6 +1093,7 @@ async function runSession16Verification() {
   if (failedCount > 0) {
     process.exit(1);
   }
+  process.exit(0);
 }
 
 runSession16Verification().catch((err) => {

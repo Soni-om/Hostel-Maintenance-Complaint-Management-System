@@ -1010,6 +1010,7 @@ async function runSession13Verification() {
   if (failedTests > 0) {
     process.exit(1);
   }
+  process.exit(0);
 }
 
 runSession13Verification().catch((err) => {

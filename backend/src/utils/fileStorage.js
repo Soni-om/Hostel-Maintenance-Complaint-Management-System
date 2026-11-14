@@ -13,8 +13,10 @@ import sharp from 'sharp';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Root uploads directory: backend/uploads/
-export const UPLOAD_ROOT = path.resolve(__dirname, '..', '..', 'uploads');
+// Root uploads directory: allows environment override for persistent cloud volume mounts
+export const UPLOAD_ROOT = process.env.UPLOAD_DIR
+  ? path.resolve(process.env.UPLOAD_DIR)
+  : path.resolve(__dirname, '..', '..', 'uploads');
 export const COMPLAINTS_UPLOAD_DIR = path.join(UPLOAD_ROOT, 'complaints');
 
 // Ensure storage directory exists
@@ -54,9 +56,12 @@ export function resolveSafeStoragePath(storageKey) {
     throw new Error('Invalid storage key parameter.');
   }
 
-  // Normalize path and remove any relative upward traversal tokens
-  const sanitizedKey = storageKey.replace(/^(\.\.[\/\\])+/, '');
-  const absolutePath = path.resolve(UPLOAD_ROOT, sanitizedKey);
+  // Guard: detect path traversal tokens
+  if (storageKey.includes('..')) {
+    throw new Error('Access Denied: Path traversal detected.');
+  }
+
+  const absolutePath = path.resolve(UPLOAD_ROOT, storageKey);
 
   // Guard: resolved path must strictly reside inside UPLOAD_ROOT
   if (!absolutePath.startsWith(UPLOAD_ROOT)) {

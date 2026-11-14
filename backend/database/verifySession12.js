@@ -634,6 +634,7 @@ async function runSession12Verification() {
       console.log('Result: FAIL — Some verification checks failed');
     }
     console.log('========================================================================\n');
+    process.exit(passedCount === totalCount ? 0 : 1);
   }
 }
 

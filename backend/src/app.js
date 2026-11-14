@@ -26,12 +26,33 @@ const app = express();
 // 1. Core Global Middleware
 // ==========================================
 
-// Cross-Origin Resource Sharing
+// Trust reverse proxy headers in cloud environments (Railway, Render, AWS, Nginx)
+app.set('trust proxy', 1);
+
+// Cross-Origin Resource Sharing (CORS) allowlist
+const rawFrontendOrigin = process.env.FRONTEND_ORIGIN || process.env.CLIENT_URL || '*';
+const allowedOrigins = rawFrontendOrigin
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 const corsOptions = {
-  origin: process.env.FRONTEND_ORIGIN || process.env.CLIENT_URL || '*',
+  origin: (origin, callback) => {
+    // Allow non-browser requests (e.g. mobile apps, curl, server-to-server) or wildcard
+    if (!origin || allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    const error = new Error(`CORS blocked: Origin '${origin}' is not in the allowed list.`);
+    error.statusCode = 403;
+    return callback(error);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Disposition']
 };
 app.use(cors(corsOptions));
 

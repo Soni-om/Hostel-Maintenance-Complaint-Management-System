@@ -1115,6 +1115,7 @@ async function runSession15Verification() {
   if (failedTests > 0) {
     process.exit(1);
   }
+  process.exit(0);
 }
 
 runSession15Verification().catch((err) => {

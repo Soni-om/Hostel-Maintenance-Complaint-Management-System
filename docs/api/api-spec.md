@@ -757,3 +757,49 @@ Base URL: `http://localhost:5000/api/v1`
   - `401 Unauthorized`: Missing or invalid Bearer JWT.
   - `403 Forbidden`: Non-admin role (`FORBIDDEN_ROLE`).
 
+---
+
+## 9. System & Database Health Probes
+
+### 9.1 Application & Database Health Probe
+- **Method:** `GET`
+- **Endpoint:** `/health` (also `/api/health` and `/api/v1/health`)
+- **Access:** Public (Unauthenticated)
+- **Description:** Verifies Express server availability, runtime uptime, and executes a live `SELECT 1` ping against MySQL.
+- **Security:** Masks all credentials, passwords, and sensitive connection strings.
+- **Success:** `200 OK` (Healthy)
+  ```json
+  {
+    "status": "healthy",
+    "application": "HostelCare",
+    "version": "1.0.0",
+    "environment": "production",
+    "uptimeSeconds": 120,
+    "timestamp": "2026-11-14T08:30:00.000Z",
+    "database": {
+      "status": "connected",
+      "latencyMs": 14,
+      "database": "hostelcare_db"
+    }
+  }
+  ```
+- **Degraded Status:** `503 Service Unavailable` when database cannot be reached.
+
+### 9.2 Dedicated Database Health Probe
+- **Method:** `GET`
+- **Endpoint:** `/health/db` (also `/api/health/db` and `/api/v1/health/db`)
+- **Access:** Public (Unauthenticated)
+- **Description:** Executes a dedicated query to measure database connection latency.
+- **Success:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "database": {
+      "status": "connected",
+      "latencyMs": 12,
+      "targetDatabase": "hostelcare_db"
+    },
+    "timestamp": "2026-11-14T08:30:00.000Z"
+  }
+  ```
+

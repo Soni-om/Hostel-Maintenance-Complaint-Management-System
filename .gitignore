@@ -16,6 +16,8 @@ logs/
 # Runtime data and uploads (ignore uploaded files, keep folder structure)
 backend/uploads/complaints/*
 !backend/uploads/complaints/.gitkeep
+backend/database/backups/*
+!backend/database/backups/.gitkeep
 
 # Operating System Files
 .DS_Store
