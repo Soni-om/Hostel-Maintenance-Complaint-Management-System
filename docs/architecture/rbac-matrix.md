@@ -35,8 +35,12 @@
 | **Categories: List** | `GET /api/v1/categories` | ✅ | ✅ | ✅ | Publicly visible to all authenticated roles. |
 | **Categories: Manage** | `POST/PUT/DELETE /api/v1/categories` | ❌ | ❌ | ✅ | Admin only. |
 | **Users: Provision Staff** | `POST /api/v1/users` | ❌ | ❌ | ✅ | Admin only. Controlled `staff` account creation only. Admin creation via API is strictly rejected (400 Bad Request) as Admin accounts are system-seeded. |
-| **Users: List Directory** | `GET /api/v1/users` | ❌ | ❌ | ✅ | Admin only. Paginated with role/status filters. |
-| **Users: Toggle Status** | `PATCH /api/v1/users/:id/status` | ❌ | ❌ | ✅ | Admin only. Cannot self-deactivate. |
+| **Users: List Directory** | `GET /api/v1/users` or `GET /api/v1/admin/users` | ❌ | ❌ | ✅ | Admin only. Paginated with role/status/search filters. |
+| **Users: Update Details** | `PATCH /api/v1/users/:id` or `PATCH /api/v1/admin/users/:id` | ❌ | ❌ | ✅ | Admin only. Updates name, phone, role, room, block. Last active Admin demotion protected (400 `CANNOT_DISABLE_LAST_ADMIN`). |
+| **Users: Toggle Status** | `PATCH /api/v1/users/:id/status` or `PATCH /api/v1/admin/users/:id/status` | ❌ | ❌ | ✅ | Admin only. Self-deactivation forbidden (400 `SELF_DEACTIVATION_DENIED`). Last active Admin deactivation forbidden (400 `CANNOT_DISABLE_LAST_ADMIN`). |
+| **Categories: List** | `GET /api/v1/categories` | ✅ | ✅ | ✅ | Publicly visible to all authenticated roles. Admin can supply `?include_inactive=true`. |
+| **Categories: Manage** | `POST/PUT/PATCH/DELETE /api/v1/categories` or `/api/v1/admin/categories` | ❌ | ❌ | ✅ | Admin only. Deletion rejected with 409 `CATEGORY_IN_USE` if referenced by historical complaints. |
+| **Admin: Live Statistics** | `GET /api/v1/admin/stats` or `GET /api/v1/admin/dashboard` | ❌ | ❌ | ✅ | Admin only. Real database metrics: complaints, users, SLA, and feedback. |
 | **Staff: Operations Overview** | `GET /api/v1/staff/overview` | ❌ | ✅ | ✅ | Staff & Admin only. Maintenance queue overview. |
 | **Staff: Complaints Queue** | `GET /api/v1/staff/complaints` | ❌ | ✅ | ✅ | Staff & Admin only. Option D visibility, keyword search, status/cat/priority/date filters, pagination, and real-time DB stats. |
 | **Stats: Dashboard** | `GET /api/v1/stats/dashboard` | ✅ | ✅ | ✅ | Scoped dynamically per role context. |
@@ -52,8 +56,16 @@
 | `GET` | `/api/v1/auth/me` | Bearer JWT | `student`, `staff`, `admin` | Live DB check (`findById`). Excludes `password_hash`. Account must be `active`. | `200`, `401`, `403` |
 | `POST` | `/api/v1/auth/logout` | Optional Bearer | All Roles | Client-side token discard acknowledgment. | `200` |
 | `POST` | `/api/v1/users` | Bearer JWT | `admin` | Admin can provision `staff` accounts only. Admin accounts are system-seeded; `role: 'admin'` rejected with 400 Bad Request. Bcrypt 10 rounds. | `201`, `400`, `401`, `403`, `409` |
-| `GET` | `/api/v1/users` | Bearer JWT | `admin` | Returns user directory. Never leaks `password_hash`. Paginated. | `200`, `401`, `403` |
-| `PATCH` | `/api/v1/users/:id/status` | Bearer JWT | `admin` | Cannot deactivate own admin account. | `200`, `400`, `401`, `403`, `404` |
+| `GET` | `/api/v1/users` or `/api/v1/admin/users` | Bearer JWT | `admin` | Returns user directory. Never leaks `password_hash`. Paginated with role/status/search filters. | `200`, `401`, `403` |
+| `GET` | `/api/v1/admin/users/:id` | Bearer JWT | `admin` | Returns single user profile without password_hash. | `200`, `400`, `401`, `403`, `404` |
+| `PATCH` | `/api/v1/users/:id` or `/api/v1/admin/users/:id` | Bearer JWT | `admin` | Updates user details. Demoting last active Admin forbidden (`CANNOT_DISABLE_LAST_ADMIN`). | `200`, `400`, `401`, `403`, `404` |
+| `PATCH` | `/api/v1/users/:id/status` or `/api/v1/admin/users/:id/status` | Bearer JWT | `admin` | Cannot deactivate own admin account. Disabling last active Admin forbidden (`CANNOT_DISABLE_LAST_ADMIN`). | `200`, `400`, `401`, `403`, `404` |
+| `GET` | `/api/v1/categories` | Bearer JWT | All Roles | Active complaint categories. Admin can pass `?include_inactive=true` to see all. | `200`, `401` |
+| `POST` | `/api/v1/admin/categories` | Bearer JWT | `admin` | Creates new category. Unique name enforced (409). | `201`, `400`, `401`, `403`, `409` |
+| `PATCH` | `/api/v1/admin/categories/:id` | Bearer JWT | `admin` | Updates category description or name. | `200`, `400`, `401`, `403`, `404`, `409` |
+| `PATCH` | `/api/v1/admin/categories/:id/status` | Bearer JWT | `admin` | Toggles category active status. Inactive categories excluded from student ticket forms. | `200`, `400`, `401`, `403`, `404` |
+| `DELETE` | `/api/v1/admin/categories/:id` | Bearer JWT | `admin` | Deletes unused category. Rejected with 409 `CATEGORY_IN_USE` if referenced by complaints. | `200`, `400`, `401`, `403`, `404`, `409` |
+| `GET` | `/api/v1/admin/stats` or `/api/v1/admin/dashboard` | Bearer JWT | `admin` | Comprehensive live system statistics from MySQL database. Students & Staff forbidden (403). | `200`, `401`, `403` |
 | `GET` | `/api/v1/staff/overview` | Bearer JWT | `staff`, `admin` | Maintenance staff dashboard metrics. Students forbidden (403). | `200`, `401`, `403` |
 | `GET` | `/api/v1/staff/technicians` | Bearer JWT | `staff`, `admin` | Active technicians directory (`role = 'staff'`, `account_status = 'active'`). Excludes students and admin. | `200`, `401`, `403` |
 | `GET` | `/api/v1/staff/complaints` | Bearer JWT | `staff`, `admin` | Option D hybrid visibility. Keyword search, multi-field filters, pagination, and real stats. Students forbidden (403). | `200`, `400`, `401`, `403` |

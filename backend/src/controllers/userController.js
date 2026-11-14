@@ -152,8 +152,112 @@ const UserController = {
   async updateStatus(req, res) {
     try {
       const targetId = parseInt(req.params.id, 10);
-      const { account_status } = req.body;
+      const { account_status, status } = req.body;
+      const targetStatus = (account_status || status || '').toLowerCase().trim();
 
+      if (isNaN(targetId) || targetId <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid user identifier specified.'
+        });
+      }
+
+      if (!['active', 'inactive'].includes(targetStatus)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid account status. Permitted values are 'active' or 'inactive'."
+        });
+      }
+
+      const targetUser = await UserModel.findById(targetId);
+      if (!targetUser) {
+        return res.status(404).json({
+          success: false,
+          message: 'Target user record not found.'
+        });
+      }
+
+      // Safety check 1: Prevent admin from deactivating their own account
+      if (req.user && req.user.id === targetId && targetStatus === 'inactive') {
+        return res.status(400).json({
+          success: false,
+          code: 'SELF_DEACTIVATION_DENIED',
+          message: 'Self-deactivation denied. Administrators cannot deactivate their own active account.'
+        });
+      }
+
+      // Safety check 2: Prevent disabling the last active Administrator account
+      if (targetStatus === 'inactive' && targetUser.role === 'admin' && targetUser.account_status === 'active') {
+        const activeAdminCount = await UserModel.countActiveAdmins();
+        if (activeAdminCount <= 1) {
+          return res.status(400).json({
+            success: false,
+            code: 'CANNOT_DISABLE_LAST_ADMIN',
+            message: 'Action denied: Cannot disable or demote the last active Administrator account.'
+          });
+        }
+      }
+
+      const updatedUser = await UserModel.updateStatus(targetId, targetStatus);
+
+      return res.status(200).json({
+        success: true,
+        message: `Account status updated to '${targetStatus}' successfully.`,
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error('Update Status Controller Error:', error.message);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while updating user status.'
+      });
+    }
+  },
+
+  /**
+   * Get User by ID
+   * GET /api/admin/users/:id or /api/users/:id
+   * Access: Admin only
+   */
+  async getUserById(req, res) {
+    try {
+      const targetId = parseInt(req.params.id, 10);
+      if (isNaN(targetId) || targetId <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid user identifier specified.'
+        });
+      }
+
+      const user = await UserModel.findById(targetId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User record not found.'
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        user
+      });
+    } catch (error) {
+      console.error('Get User Details Controller Error:', error.message);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while retrieving user details.'
+      });
+    }
+  },
+
+  /**
+   * Update User Account (Admin Governance)
+   * PATCH /api/admin/users/:id or /api/users/:id
+   * Access: Admin only
+   */
+  async updateUser(req, res) {
+    try {
+      const targetId = parseInt(req.params.id, 10);
       if (isNaN(targetId) || targetId <= 0) {
         return res.status(400).json({
           success: false,
@@ -169,26 +273,79 @@ const UserController = {
         });
       }
 
-      // Safety check: Prevent admin from deactivating their own account
-      if (req.user && req.user.id === targetId && account_status === 'inactive') {
+      const {
+        name,
+        phone,
+        role,
+        account_status,
+        status,
+        staff_designation,
+        hostel_block,
+        room_number
+      } = req.body;
+
+      const requestedStatus = account_status || status;
+
+      // Validate status if provided
+      if (requestedStatus && !['active', 'inactive'].includes(requestedStatus.toLowerCase())) {
         return res.status(400).json({
           success: false,
+          message: "Invalid account status. Permitted values are 'active' or 'inactive'."
+        });
+      }
+
+      // Validate role if provided
+      if (role && !['student', 'staff', 'admin'].includes(role.toLowerCase())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid role specified. Permitted roles are 'student', 'staff', or 'admin'."
+        });
+      }
+
+      // Safety check 1: Prevent self-deactivation
+      if (req.user && req.user.id === targetId && requestedStatus && requestedStatus.toLowerCase() === 'inactive') {
+        return res.status(400).json({
+          success: false,
+          code: 'SELF_DEACTIVATION_DENIED',
           message: 'Self-deactivation denied. Administrators cannot deactivate their own active account.'
         });
       }
 
-      const updatedUser = await UserModel.updateStatus(targetId, account_status);
+      // Safety check 2: Prevent disabling or demoting the last active Administrator
+      const willDeactivate = requestedStatus && requestedStatus.toLowerCase() === 'inactive';
+      const willDemote = role && role.toLowerCase() !== 'admin';
+
+      if ((willDeactivate || willDemote) && targetUser.role === 'admin' && targetUser.account_status === 'active') {
+        const activeAdminCount = await UserModel.countActiveAdmins();
+        if (activeAdminCount <= 1) {
+          return res.status(400).json({
+            success: false,
+            code: 'CANNOT_DISABLE_LAST_ADMIN',
+            message: 'Action denied: Cannot disable or demote the last active Administrator account.'
+          });
+        }
+      }
+
+      const updatedUser = await UserModel.updateUser(targetId, {
+        name,
+        phone,
+        role,
+        account_status: requestedStatus,
+        staff_designation,
+        hostel_block,
+        room_number
+      });
 
       return res.status(200).json({
         success: true,
-        message: `Account status updated to '${account_status}' successfully.`,
+        message: 'User account updated successfully.',
         user: updatedUser
       });
     } catch (error) {
-      console.error('Update Status Controller Error:', error.message);
+      console.error('Update User Controller Error:', error.message);
       return res.status(500).json({
         success: false,
-        message: 'An unexpected internal error occurred while updating user status.'
+        message: 'An unexpected internal error occurred while updating user account.'
       });
     }
   }

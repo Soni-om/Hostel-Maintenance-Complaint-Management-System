@@ -1,15 +1,216 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Governance — HostelCare</title>
+  <title>Admin Governance & Management — HostelCare</title>
   <link rel="stylesheet" href="/assets/css/variables.css">
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/components.css">
+  <style>
+    /* Tab Navigation */
+    .tab-bar {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 2px solid var(--color-border);
+      margin-bottom: 2rem;
+    }
+
+    .tab-btn {
+      padding: 0.75rem 1.5rem;
+      font-size: var(--font-sm);
+      font-weight: 600;
+      color: var(--color-text-muted);
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .tab-btn:hover {
+      color: var(--color-text-main);
+    }
+
+    .tab-btn.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    /* Filter & Search Bar */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--color-bg-surface);
+      padding: 1.25rem 1.5rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-border);
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .filter-select,
+    .filter-input {
+      padding: 0.45rem 0.75rem;
+      font-size: var(--font-sm);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-bg);
+      color: var(--color-text-main);
+    }
+
+    .filter-input:focus,
+    .filter-select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.15);
+    }
+
+    /* Status & Role Badges */
+    .badge-role-admin {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .badge-role-staff {
+      background: #eff6ff;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+    }
+
+    .badge-role-student {
+      background: #f0fdf4;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    .badge-status-active {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+    }
+
+    .badge-status-inactive {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+    }
+
+    /* Modal Overlay & Card */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(2px);
+    }
+
+    .modal-card {
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 580px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-xl);
+      border: 1px solid var(--color-border);
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+    }
+
+    .modal-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    .stat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      font-size: var(--font-xs);
+      font-weight: 600;
+    }
+
+    .stat-pill-pending { background: #fef3c7; color: #92400e; }
+    .stat-pill-assigned { background: #e0e7ff; color: #3730a3; }
+    .stat-pill-in_progress { background: #dbeafe; color: #1e40af; }
+    .stat-pill-resolved { background: #dcfce7; color: #166534; }
+    .stat-pill-closed { background: #f1f5f9; color: #475569; }
+
+    .table-container {
+      overflow-x: auto;
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1.5rem;
+      color: var(--color-text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--color-border);
+      font-size: var(--font-sm);
+    }
+  </style>
 </head>
+
 <body>
-  <!-- Header -->
+  <!-- Header / Navigation -->
   <header class="navbar">
     <div class="container navbar-content">
       <a href="/" class="brand">
@@ -28,74 +229,269 @@
     </div>
   </header>
 
-  <main class="container" style="padding-top: 2.5rem; padding-bottom: 3rem;">
+  <main class="container" style="padding-top: 2rem; padding-bottom: 3.5rem;">
     <!-- Welcome Header -->
-    <div class="flex justify-between items-center" style="margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+    <div class="flex justify-between items-center" style="margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
       <div>
-        <h1>System Administration & Governance</h1>
-        <p class="text-muted">Hostel-wide analytics, user role administration, and complaint category configuration.</p>
+        <h1 style="margin-bottom: 0.25rem;">System Administration & Governance</h1>
+        <p class="text-muted text-sm">Hostel-wide analytics, user governance, and complaint category configuration.</p>
       </div>
       <div class="flex gap-2">
-        <button class="btn btn-secondary btn-sm" onclick="alert('Category management scheduled for Session 14.')">Categories</button>
-        <button class="btn btn-primary btn-sm" onclick="toggleProvisioningModal()">+ Provision Staff</button>
+        <button class="btn btn-secondary btn-sm" onclick="switchTab('categories')">Manage Categories</button>
+        <button class="btn btn-primary btn-sm" onclick="openProvisionModal()">+ Provision Staff</button>
       </div>
     </div>
 
-    <!-- Quick Metric Cards -->
-    <div class="grid grid-cols-4" style="margin-bottom: 2.5rem;">
+    <!-- Live System Metric Cards -->
+    <div class="grid grid-cols-4" style="margin-bottom: 2rem; gap: 1rem;" id="kpi-cards-grid">
       <div class="stat-card">
         <div>
-          <div class="stat-label">Total System Tickets</div>
-          <div class="stat-value">0</div>
+          <div class="stat-label">Total System Complaints</div>
+          <div class="stat-value" id="kpi-total-complaints">0</div>
+          <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 4px;" id="kpi-status-pills">
+            <span class="stat-pill stat-pill-pending" id="pill-pending">0 P</span>
+            <span class="stat-pill stat-pill-in_progress" id="pill-in_progress">0 IP</span>
+            <span class="stat-pill stat-pill-resolved" id="pill-resolved">0 R</span>
+            <span class="stat-pill stat-pill-closed" id="pill-closed">0 C</span>
+          </div>
         </div>
         <div style="font-size: 2rem;">📊</div>
       </div>
       <div class="stat-card">
         <div>
           <div class="stat-label">Registered Students</div>
-          <div class="stat-value" id="admin-student-count">4</div>
+          <div class="stat-value" id="kpi-students-count">0</div>
+          <div class="text-muted" style="font-size: var(--font-xs); margin-top: 0.25rem;">Active residents</div>
         </div>
         <div style="font-size: 2rem;">🎓</div>
       </div>
       <div class="stat-card">
         <div>
-          <div class="stat-label">Active Staff</div>
-          <div class="stat-value" id="admin-staff-count">3</div>
+          <div class="stat-label">Maintenance Staff</div>
+          <div class="stat-value" id="kpi-staff-count">0</div>
+          <div class="text-muted" style="font-size: var(--font-xs); margin-top: 0.25rem;"><span id="kpi-active-staff">0</span> active technicians</div>
         </div>
         <div style="font-size: 2rem;">👷</div>
       </div>
       <div class="stat-card">
         <div>
-          <div class="stat-label">Avg. Resolution (Hours)</div>
-          <div class="stat-value">0.0</div>
+          <div class="stat-label">Avg. Resolution Time</div>
+          <div class="stat-value" id="kpi-avg-resolution">0.0h</div>
+          <div class="text-muted" style="font-size: var(--font-xs); margin-top: 0.25rem;"><span id="kpi-resolved-total">0</span> tickets resolved</div>
         </div>
         <div style="font-size: 2rem;">⏱️</div>
       </div>
     </div>
 
-    <!-- Staff Provisioning Panel (Session 8 Feature) -->
-    <div class="card" id="provisioning-card" style="margin-bottom: 2rem; display: none;">
-      <div class="card-header flex justify-between items-center">
-        <h3 class="card-title">Controlled Staff Account Provisioning</h3>
-        <button class="btn btn-secondary btn-sm" onclick="toggleProvisioningModal()">Close</button>
+    <!-- Main Navigation Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-btn-overview" onclick="switchTab('overview')">
+        <span>📊</span> System Overview
+      </button>
+      <button class="tab-btn" id="tab-btn-users" onclick="switchTab('users')">
+        <span>👥</span> User Governance
+      </button>
+      <button class="tab-btn" id="tab-btn-categories" onclick="switchTab('categories')">
+        <span>🏷️</span> Category Master
+      </button>
+    </div>
+
+    <!-- TAB 1: System Overview -->
+    <div class="tab-pane active" id="tab-pane-overview">
+      <div class="grid grid-cols-2" style="gap: 1.5rem; margin-bottom: 2rem;">
+        <!-- Status & Priority Breakdown -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Complaint Status Breakdown</h3>
+            <span class="badge badge-assigned">Live DB</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div class="flex justify-between items-center" style="padding: 0.5rem 0; border-bottom: 1px solid var(--color-border-light);">
+              <span class="badge badge-pending">Pending Review</span>
+              <strong id="overview-pending-count">0</strong>
+            </div>
+            <div class="flex justify-between items-center" style="padding: 0.5rem 0; border-bottom: 1px solid var(--color-border-light);">
+              <span class="badge badge-assigned">Assigned to Staff</span>
+              <strong id="overview-assigned-count">0</strong>
+            </div>
+            <div class="flex justify-between items-center" style="padding: 0.5rem 0; border-bottom: 1px solid var(--color-border-light);">
+              <span class="badge badge-in_progress">Work In Progress</span>
+              <strong id="overview-inprogress-count">0</strong>
+            </div>
+            <div class="flex justify-between items-center" style="padding: 0.5rem 0; border-bottom: 1px solid var(--color-border-light);">
+              <span class="badge badge-resolved">Resolved (Awaiting Close)</span>
+              <strong id="overview-resolved-count">0</strong>
+            </div>
+            <div class="flex justify-between items-center" style="padding: 0.5rem 0;">
+              <span class="badge badge-closed">Closed Satisfactorily</span>
+              <strong id="overview-closed-count">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resident Feedback & Quality Rating -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Resident Satisfaction & Feedback</h3>
+            <span class="badge badge-resolved">Quality SLA</span>
+          </div>
+          <div style="text-align: center; padding: 1.5rem 0;">
+            <div style="font-size: 3rem; font-weight: 700; color: #eab308; line-height: 1;" id="overview-feedback-score">0.0</div>
+            <div style="margin-top: 0.5rem; font-size: 1.25rem;" id="overview-feedback-stars">☆☆☆☆☆</div>
+            <p class="text-muted text-sm" style="margin-top: 0.5rem;">
+              Based on <strong id="overview-feedback-count">0</strong> verified student resolution ratings
+            </p>
+          </div>
+        </div>
       </div>
-      <div style="padding: 1.5rem;">
-        <form id="provision-staff-form" class="grid grid-cols-2" style="gap: 1rem;">
-          <div>
-            <label class="form-label" for="staff-name">Staff Member Full Name *</label>
-            <input type="text" id="staff-name" class="form-control" placeholder="e.g. Anand Varma" required>
+
+      <!-- Recent System Complaints Table -->
+      <div class="card">
+        <div class="card-header flex justify-between items-center">
+          <h3 class="card-title">Recent System Maintenance Requests</h3>
+          <span class="text-muted text-sm">Latest Activity</span>
+        </div>
+        <div class="table-container" style="border: none; box-shadow: none;">
+          <table class="table" style="width: 100%;">
+            <thead>
+              <tr>
+                <th>Ticket ID</th>
+                <th>Student</th>
+                <th>Category</th>
+                <th>Title</th>
+                <th>Block / Room</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="recent-complaints-tbody">
+              <tr>
+                <td colspan="8" class="empty-state">Loading recent complaints...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: User Governance -->
+    <div class="tab-pane" id="tab-pane-users">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <input type="text" id="user-search-input" class="filter-input" placeholder="Search by name, email..." style="min-width: 240px;">
+          <select id="user-role-filter" class="filter-select">
+            <option value="">All Roles</option>
+            <option value="student">Student</option>
+            <option value="staff">Staff</option>
+            <option value="admin">Administrator</option>
+          </select>
+          <select id="user-status-filter" class="filter-select">
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="applyUserFilters()">Apply Filters</button>
+          <button class="btn btn-secondary btn-sm" onclick="resetUserFilters()">Reset</button>
+        </div>
+        <div>
+          <button class="btn btn-primary btn-sm" onclick="openProvisionModal()">+ Provision Staff</button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Hostel / Details</th>
+              <th>Phone</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-table-tbody">
+            <tr>
+              <td colspan="8" class="empty-state">Loading user directory...</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="pagination-bar" id="users-pagination-bar" style="display: none;">
+          <span id="users-pagination-info">Showing 0 of 0 users</span>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" id="btn-users-prev" onclick="prevUserPage()">Previous</button>
+            <button class="btn btn-secondary btn-sm" id="btn-users-next" onclick="nextUserPage()">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Category Master -->
+    <div class="tab-pane" id="tab-pane-categories">
+      <div class="filter-bar">
+        <div class="flex items-center gap-2">
+          <span style="font-weight: 600;">Maintenance Categories Master</span>
+          <span class="badge badge-assigned" id="category-total-badge">0 categories</span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openAddCategoryModal()">+ Add New Category</button>
+      </div>
+
+      <div class="table-container">
+        <table class="table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Category Name</th>
+              <th>Description</th>
+              <th>Associated Complaints</th>
+              <th>Status</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="categories-table-tbody">
+            <tr>
+              <td colspan="6" class="empty-state">Loading categories...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==========================================
+       MODALS
+       ========================================== -->
+
+  <!-- Modal: Provision Staff -->
+  <div class="modal-overlay" id="modal-provision-staff" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="card-title" style="margin: 0;">Controlled Staff Account Provisioning</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeProvisionModal()">✕</button>
+      </div>
+      <form id="provision-staff-form">
+        <div class="modal-body grid grid-cols-2" style="gap: 1rem;">
+          <div style="grid-column: span 2;">
+            <p class="text-muted text-sm">Provision a verified hostel maintenance staff technician or supervisor.</p>
           </div>
           <div>
-            <label class="form-label" for="staff-email">Official Email Address *</label>
-            <input type="email" id="staff-email" class="form-control" placeholder="e.g. anand.carpenter@hostelcare.edu" required>
+            <label class="form-label" for="staff-name">Full Name *</label>
+            <input type="text" id="staff-name" class="form-control" placeholder="e.g. Ramesh Kumar" required>
           </div>
           <div>
-            <label class="form-label" for="staff-password">Initial Temporary Password *</label>
-            <input type="password" id="staff-password" class="form-control" placeholder="Minimum 6 characters" required minlength="6">
+            <label class="form-label" for="staff-email">Official Email *</label>
+            <input type="email" id="staff-email" class="form-control" placeholder="e.g. ramesh.plumber@hostelcare.edu" required>
           </div>
           <div>
-            <label class="form-label" for="staff-designation">Maintenance Designation *</label>
-            <input type="text" id="staff-designation" class="form-control" placeholder="e.g. Carpenter, Electrician, Plumber" required>
+            <label class="form-label" for="staff-password">Initial Password *</label>
+            <input type="password" id="staff-password" class="form-control" placeholder="Min 6 characters" required minlength="6">
+          </div>
+          <div>
+            <label class="form-label" for="staff-designation">Designation *</label>
+            <input type="text" id="staff-designation" class="form-control" placeholder="e.g. Plumber, Electrician" required>
           </div>
           <div>
             <label class="form-label" for="staff-block">Assigned Hostel Block</label>
@@ -106,43 +502,160 @@
             </select>
           </div>
           <div>
-            <label class="form-label" for="staff-phone">Contact Phone Number</label>
-            <input type="tel" id="staff-phone" class="form-control" placeholder="e.g. +91 9899112233">
+            <label class="form-label" for="staff-phone">Contact Phone</label>
+            <input type="tel" id="staff-phone" class="form-control" placeholder="e.g. +91 9876543210">
           </div>
-          <div style="grid-column: span 2; display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
-            <button type="button" class="btn btn-secondary" onclick="toggleProvisioningModal()">Cancel</button>
-            <button type="submit" id="btn-submit-provision" class="btn btn-primary">Create Staff Account</button>
-          </div>
-        </form>
-      </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeProvisionModal()">Cancel</button>
+          <button type="submit" id="btn-submit-provision" class="btn btn-primary">Create Staff Account</button>
+        </div>
+      </form>
     </div>
+  </div>
 
-    <!-- Admin Overview Panel -->
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">Hostel System Overview</h3>
-        <span class="badge badge-closed">Admin Privileges</span>
+  <!-- Modal: Edit User -->
+  <div class="modal-overlay" id="modal-edit-user" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="card-title" style="margin: 0;">Edit User Account</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeEditUserModal()">✕</button>
       </div>
-      <div style="text-align: center; padding: 3rem 1rem;">
-        <div style="font-size: 3rem; margin-bottom: 1rem;">🏢</div>
-        <h3>System Governance Center Ready</h3>
-        <p class="text-muted text-sm" style="max-width: 440px; margin: 0 auto;">
-          The Admin console provides centralized control over staff accounts, category master definitions, and SLA performance dashboards (Phase 4, Sessions 13-15).
-        </p>
-      </div>
+      <form id="edit-user-form">
+        <input type="hidden" id="edit-user-id">
+        <div class="modal-body grid grid-cols-2" style="gap: 1rem;">
+          <div>
+            <label class="form-label" for="edit-user-name">Full Name *</label>
+            <input type="text" id="edit-user-name" class="form-control" required>
+          </div>
+          <div>
+            <label class="form-label" for="edit-user-email">Email (Immutable)</label>
+            <input type="email" id="edit-user-email" class="form-control" disabled style="background: var(--color-bg-muted);">
+          </div>
+          <div>
+            <label class="form-label" for="edit-user-role">System Role *</label>
+            <select id="edit-user-role" class="form-control">
+              <option value="student">Student</option>
+              <option value="staff">Staff</option>
+              <option value="admin">Administrator</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="edit-user-status">Account Status *</label>
+            <select id="edit-user-status" class="form-control">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="edit-user-block">Hostel Block</label>
+            <select id="edit-user-block" class="form-control">
+              <option value="">None / Unassigned</option>
+              <option value="Block A">Block A</option>
+              <option value="Block B">Block B</option>
+              <option value="Block C">Block C</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="edit-user-room">Room Number</label>
+            <input type="text" id="edit-user-room" class="form-control" placeholder="e.g. 101, 204">
+          </div>
+          <div>
+            <label class="form-label" for="edit-user-phone">Phone Number</label>
+            <input type="tel" id="edit-user-phone" class="form-control" placeholder="e.g. +91 9876543210">
+          </div>
+          <div>
+            <label class="form-label" for="edit-user-designation">Staff Designation</label>
+            <input type="text" id="edit-user-designation" class="form-control" placeholder="e.g. Carpenter, Supervisor">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeEditUserModal()">Cancel</button>
+          <button type="submit" id="btn-save-user" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
     </div>
-  </main>
+  </div>
+
+  <!-- Modal: Add Category -->
+  <div class="modal-overlay" id="modal-add-category" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="card-title" style="margin: 0;">Add New Maintenance Category</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeAddCategoryModal()">✕</button>
+      </div>
+      <form id="add-category-form">
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 1rem;">
+          <div>
+            <label class="form-label" for="add-cat-name">Category Name *</label>
+            <input type="text" id="add-cat-name" class="form-control" placeholder="e.g. HVAC & Air Conditioning" required minlength="2" maxlength="100">
+          </div>
+          <div>
+            <label class="form-label" for="add-cat-desc">Description</label>
+            <textarea id="add-cat-desc" class="form-control" rows="3" placeholder="Brief explanation of items covered under this category" maxlength="255"></textarea>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="add-cat-active" checked style="width: 16px; height: 16px;">
+            <label for="add-cat-active" style="font-size: var(--font-sm); cursor: pointer;">Active (Visible to students for new tickets)</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeAddCategoryModal()">Cancel</button>
+          <button type="submit" id="btn-create-category" class="btn btn-primary">Create Category</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Category -->
+  <div class="modal-overlay" id="modal-edit-category" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="card-title" style="margin: 0;">Edit Category</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeEditCategoryModal()">✕</button>
+      </div>
+      <form id="edit-category-form">
+        <input type="hidden" id="edit-cat-id">
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 1rem;">
+          <div>
+            <label class="form-label" for="edit-cat-name">Category Name *</label>
+            <input type="text" id="edit-cat-name" class="form-control" required minlength="2" maxlength="100">
+          </div>
+          <div>
+            <label class="form-label" for="edit-cat-desc">Description</label>
+            <textarea id="edit-cat-desc" class="form-control" rows="3" maxlength="255"></textarea>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="edit-cat-active" style="width: 16px; height: 16px;">
+            <label for="edit-cat-active" style="font-size: var(--font-sm); cursor: pointer;">Active (Visible to students for new tickets)</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeEditCategoryModal()">Cancel</button>
+          <button type="submit" id="btn-save-category" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script src="/js/config.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/utils.js"></script>
   <script src="/js/auth.js"></script>
   <script>
-    // Enforce admin role access control and background profile verification
+    // Enforce strict admin role access control
     if (window.Auth) {
       window.Auth.requireAuth(['admin']);
     }
 
+    // State management
+    let currentTab = 'overview';
+    let userPage = 1;
+    const userLimit = 10;
+    let totalUsers = 0;
+    let categoriesList = [];
+
+    // Health Probe
     async function checkStatus() {
       const dot = document.getElementById('admin-dot');
       const label = document.getElementById('admin-status-label');
@@ -159,49 +672,402 @@
         }
       } catch (err) {
         dot.style.boxShadow = 'none';
-        if (err.status === 503) {
-          dot.style.background = 'var(--color-warning)';
-          label.textContent = 'Service Degraded (DB Offline)';
-        } else {
-          dot.style.background = 'var(--color-danger)';
-          label.textContent = 'Backend Offline';
-        }
+        dot.style.background = 'var(--color-danger)';
+        label.textContent = 'Backend Offline';
       }
     }
 
-    function toggleProvisioningModal() {
-      const card = document.getElementById('provisioning-card');
-      card.style.display = card.style.display === 'none' ? 'block' : 'none';
-      if (card.style.display === 'block') {
-        document.getElementById('staff-name').focus();
-      }
+    // Tab Switching
+    function switchTab(tabName) {
+      currentTab = tabName;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+      const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+      const activePane = document.getElementById(`tab-pane-${tabName}`);
+      if (activeBtn) activeBtn.classList.add('active');
+      if (activePane) activePane.classList.add('active');
+
+      if (tabName === 'overview') loadDashboardStats();
+      if (tabName === 'users') loadUsers();
+      if (tabName === 'categories') loadCategories();
     }
 
-    async function loadUserMetrics() {
+    // Format helper
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatDate(dt) {
+      if (!dt) return '—';
       try {
-        const [studentRes, staffRes] = await Promise.all([
-          window.Api.get('/users?role=student', { silent: true }).catch(() => null),
-          window.Api.get('/users?role=staff', { silent: true }).catch(() => null)
-        ]);
-
-        if (studentRes && studentRes.pagination) {
-          document.getElementById('admin-student-count').textContent = studentRes.pagination.total;
-        }
-        if (staffRes && staffRes.pagination) {
-          document.getElementById('admin-staff-count').textContent = staffRes.pagination.total;
-        }
-      } catch (e) {
-        console.warn('Could not refresh user metrics:', e.message);
+        const d = new Date(dt);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      } catch {
+        return dt;
       }
     }
 
+    // 1. Load Live Database Statistics
+    async function loadDashboardStats() {
+      try {
+        const response = await window.Api.get('/admin/stats');
+        if (!response || !response.stats) return;
+
+        const s = response.stats;
+
+        // KPI cards
+        document.getElementById('kpi-total-complaints').textContent = s.complaints.total;
+        document.getElementById('pill-pending').textContent = `${s.complaints.pending} Pending`;
+        document.getElementById('pill-in_progress').textContent = `${s.complaints.in_progress} In Progress`;
+        document.getElementById('pill-resolved').textContent = `${s.complaints.resolved} Resolved`;
+        document.getElementById('pill-closed').textContent = `${s.complaints.closed} Closed`;
+
+        document.getElementById('kpi-students-count').textContent = s.users.students;
+        document.getElementById('kpi-staff-count').textContent = s.users.staff;
+        document.getElementById('kpi-active-staff').textContent = s.users.active_staff;
+
+        document.getElementById('kpi-avg-resolution').textContent = `${s.performance.avg_resolution_hours}h`;
+        document.getElementById('kpi-resolved-total').textContent = s.performance.resolved_total;
+
+        // Overview breakdowns
+        document.getElementById('overview-pending-count').textContent = s.complaints.pending;
+        document.getElementById('overview-assigned-count').textContent = s.complaints.assigned;
+        document.getElementById('overview-inprogress-count').textContent = s.complaints.in_progress;
+        document.getElementById('overview-resolved-count').textContent = s.complaints.resolved;
+        document.getElementById('overview-closed-count').textContent = s.complaints.closed;
+
+        // Feedback
+        const avgScore = s.feedback.avg_rating > 0 ? s.feedback.avg_rating.toFixed(1) : '0.0';
+        document.getElementById('overview-feedback-score').textContent = avgScore;
+        document.getElementById('overview-feedback-count').textContent = s.feedback.total;
+
+        const starsCount = Math.round(s.feedback.avg_rating || 0);
+        let starStr = '';
+        for (let i = 1; i <= 5; i++) {
+          starStr += i <= starsCount ? '★' : '☆';
+        }
+        document.getElementById('overview-feedback-stars').textContent = starStr;
+
+        // Recent Complaints table
+        const tbody = document.getElementById('recent-complaints-tbody');
+        if (s.recent_complaints && s.recent_complaints.length > 0) {
+          tbody.innerHTML = s.recent_complaints.map(c => `
+            <tr>
+              <td><span class="badge" style="font-family: monospace; font-weight: 600;">${escapeHtml(c.ticket_number)}</span></td>
+              <td><strong>${escapeHtml(c.student_name)}</strong></td>
+              <td>${escapeHtml(c.category_name)}</td>
+              <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(c.title)}">${escapeHtml(c.title)}</td>
+              <td>${escapeHtml(c.hostel_block || '—')}${c.room_number ? ' / ' + escapeHtml(c.room_number) : ''}</td>
+              <td><span class="badge badge-${escapeHtml(c.priority)}">${escapeHtml(c.priority)}</span></td>
+              <td><span class="badge badge-${escapeHtml(c.status)}">${escapeHtml(c.status.replace('_', ' '))}</span></td>
+              <td style="font-size: var(--font-xs); color: var(--color-text-muted);">${formatDate(c.created_at)}</td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No complaints registered yet.</td></tr>`;
+        }
+      } catch (err) {
+        console.error('Failed to load admin stats:', err);
+        if (window.Utils) {
+          window.Utils.showToast(err.message || 'Failed to load system statistics', 'danger');
+        }
+      }
+    }
+
+    // 2. User Directory & Governance
+    async function loadUsers() {
+      const tbody = document.getElementById('users-table-tbody');
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Loading user directory...</td></tr>`;
+
+      const search = document.getElementById('user-search-input').value.trim();
+      const role = document.getElementById('user-role-filter').value;
+      const status = document.getElementById('user-status-filter').value;
+
+      const params = new URLSearchParams({
+        page: userPage,
+        limit: userLimit
+      });
+      if (search) params.append('search', search);
+      if (role) params.append('role', role);
+      if (status) params.append('status', status);
+
+      try {
+        const res = await window.Api.get(`/admin/users?${params.toString()}`);
+        if (!res || !res.users) return;
+
+        totalUsers = res.pagination?.total || 0;
+        const users = res.users;
+
+        if (users.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No users match the search filters.</td></tr>`;
+          document.getElementById('users-pagination-bar').style.display = 'none';
+          return;
+        }
+
+        tbody.innerHTML = users.map(u => {
+          const roleBadgeClass = `badge-role-${u.role}`;
+          const statusBadgeClass = u.account_status === 'active' ? 'badge-status-active' : 'badge-status-inactive';
+          const toggleAction = u.account_status === 'active' ? 'deactivate' : 'activate';
+          const toggleBtnLabel = u.account_status === 'active' ? 'Deactivate' : 'Activate';
+          const toggleBtnClass = u.account_status === 'active' ? 'btn-secondary' : 'btn-primary';
+
+          let details = '—';
+          if (u.role === 'student') {
+            details = `${escapeHtml(u.hostel_block || '')} ${u.room_number ? 'Rm ' + escapeHtml(u.room_number) : ''}`.trim() || '—';
+          } else if (u.role === 'staff') {
+            details = `${escapeHtml(u.staff_designation || 'Staff')} (${escapeHtml(u.hostel_block || 'Campus')})`;
+          } else if (u.role === 'admin') {
+            details = 'Administrator';
+          }
+
+          return `
+            <tr>
+              <td><span style="font-family: monospace; color: var(--color-text-muted);">${u.id}</span></td>
+              <td><strong>${escapeHtml(u.name)}</strong></td>
+              <td>${escapeHtml(u.email)}</td>
+              <td><span class="badge ${roleBadgeClass}" style="text-transform: capitalize;">${escapeHtml(u.role)}</span></td>
+              <td><span class="badge ${statusBadgeClass}" style="text-transform: capitalize;">${escapeHtml(u.account_status)}</span></td>
+              <td><span style="font-size: var(--font-xs);">${details}</span></td>
+              <td style="font-size: var(--font-xs);">${escapeHtml(u.phone || '—')}</td>
+              <td style="text-align: right; white-space: nowrap;">
+                <button class="btn btn-secondary btn-sm" onclick="openEditUserModal(${u.id})">Edit</button>
+                <button class="btn ${toggleBtnClass} btn-sm" onclick="toggleUserStatus(${u.id}, '${toggleAction}', '${escapeHtml(u.name)}', '${u.role}')">${toggleBtnLabel}</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        // Update pagination bar
+        const paginationBar = document.getElementById('users-pagination-bar');
+        paginationBar.style.display = 'flex';
+        const start = (userPage - 1) * userLimit + 1;
+        const end = Math.min(userPage * userLimit, totalUsers);
+        document.getElementById('users-pagination-info').textContent = `Showing ${start}-${end} of ${totalUsers} users`;
+
+        document.getElementById('btn-users-prev').disabled = userPage <= 1;
+        document.getElementById('btn-users-next').disabled = userPage * userLimit >= totalUsers;
+      } catch (err) {
+        console.error('Failed to load users:', err);
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state text-danger">Error loading user directory: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function applyUserFilters() {
+      userPage = 1;
+      loadUsers();
+    }
+
+    function resetUserFilters() {
+      document.getElementById('user-search-input').value = '';
+      document.getElementById('user-role-filter').value = '';
+      document.getElementById('user-status-filter').value = '';
+      userPage = 1;
+      loadUsers();
+    }
+
+    function prevUserPage() {
+      if (userPage > 1) {
+        userPage--;
+        loadUsers();
+      }
+    }
+
+    function nextUserPage() {
+      if (userPage * userLimit < totalUsers) {
+        userPage++;
+        loadUsers();
+      }
+    }
+
+    // Toggle user status with last active admin check & confirmation
+    async function toggleUserStatus(userId, action, userName, userRole) {
+      const newStatus = action === 'activate' ? 'active' : 'inactive';
+      const confirmMsg = action === 'deactivate'
+        ? `Are you sure you want to deactivate ${userName}? Inactive users cannot log in.`
+        : `Activate account for ${userName}?`;
+
+      if (!confirm(confirmMsg)) return;
+
+      try {
+        const res = await window.Api.patch(`/admin/users/${userId}/status`, { account_status: newStatus });
+        if (window.Utils) {
+          window.Utils.showToast(res.message || `Account ${newStatus} successfully!`, 'success');
+        }
+        loadUsers();
+        loadDashboardStats();
+      } catch (err) {
+        const errorMsg = err.data?.message || err.message || 'Failed to update user status.';
+        if (window.Utils) {
+          window.Utils.showToast(errorMsg, 'danger');
+        } else {
+          alert(errorMsg);
+        }
+      }
+    }
+
+    // Edit User Modal
+    async function openEditUserModal(userId) {
+      try {
+        const res = await window.Api.get(`/admin/users/${userId}`);
+        const user = res.user;
+        if (!user) return;
+
+        document.getElementById('edit-user-id').value = user.id;
+        document.getElementById('edit-user-name').value = user.name || '';
+        document.getElementById('edit-user-email').value = user.email || '';
+        document.getElementById('edit-user-role').value = user.role || 'student';
+        document.getElementById('edit-user-status').value = user.account_status || 'active';
+        document.getElementById('edit-user-block').value = user.hostel_block || '';
+        document.getElementById('edit-user-room').value = user.room_number || '';
+        document.getElementById('edit-user-phone').value = user.phone || '';
+        document.getElementById('edit-user-designation').value = user.staff_designation || '';
+
+        document.getElementById('modal-edit-user').style.display = 'flex';
+      } catch (err) {
+        alert('Could not retrieve user details: ' + err.message);
+      }
+    }
+
+    function closeEditUserModal() {
+      document.getElementById('modal-edit-user').style.display = 'none';
+      document.getElementById('edit-user-form').reset();
+    }
+
+    // 3. Category Management
+    async function loadCategories() {
+      const tbody = document.getElementById('categories-table-tbody');
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Loading categories...</td></tr>`;
+
+      try {
+        const res = await window.Api.get('/admin/categories');
+        if (!res || !res.categories) return;
+
+        categoriesList = res.categories;
+        document.getElementById('category-total-badge').textContent = `${categoriesList.length} categories`;
+
+        if (categoriesList.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No categories configured yet.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = categoriesList.map(cat => {
+          const statusBadge = cat.active
+            ? '<span class="badge badge-status-active">Active</span>'
+            : '<span class="badge badge-status-inactive">Inactive</span>';
+          const toggleActionLabel = cat.active ? 'Deactivate' : 'Activate';
+          const toggleBtnClass = cat.active ? 'btn-secondary' : 'btn-primary';
+
+          return `
+            <tr>
+              <td><span style="font-family: monospace; color: var(--color-text-muted);">${cat.id}</span></td>
+              <td><strong>${escapeHtml(cat.name)}</strong></td>
+              <td style="max-width: 320px; font-size: var(--font-sm); color: var(--color-text-muted);">${escapeHtml(cat.description || '—')}</td>
+              <td>
+                <span class="badge" style="font-weight: 600; font-family: monospace;">${cat.complaint_count || 0} tickets</span>
+              </td>
+              <td>${statusBadge}</td>
+              <td style="text-align: right; white-space: nowrap;">
+                <button class="btn btn-secondary btn-sm" onclick="openEditCategoryModal(${cat.id})">Edit</button>
+                <button class="btn ${toggleBtnClass} btn-sm" onclick="toggleCategoryStatus(${cat.id}, ${cat.active})">${toggleActionLabel}</button>
+                <button class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fca5a5;" onclick="deleteCategory(${cat.id}, '${escapeHtml(cat.name)}', ${cat.complaint_count || 0})">Delete</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Failed to load categories:', err);
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state text-danger">Error loading categories: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function openAddCategoryModal() {
+      document.getElementById('modal-add-category').style.display = 'flex';
+      document.getElementById('add-cat-name').focus();
+    }
+
+    function closeAddCategoryModal() {
+      document.getElementById('modal-add-category').style.display = 'none';
+      document.getElementById('add-category-form').reset();
+    }
+
+    function openEditCategoryModal(catId) {
+      const cat = categoriesList.find(c => c.id === catId);
+      if (!cat) return;
+
+      document.getElementById('edit-cat-id').value = cat.id;
+      document.getElementById('edit-cat-name').value = cat.name;
+      document.getElementById('edit-cat-desc').value = cat.description || '';
+      document.getElementById('edit-cat-active').checked = Boolean(cat.active);
+
+      document.getElementById('modal-edit-category').style.display = 'flex';
+    }
+
+    function closeEditCategoryModal() {
+      document.getElementById('modal-edit-category').style.display = 'none';
+      document.getElementById('edit-category-form').reset();
+    }
+
+    async function toggleCategoryStatus(catId, currentActive) {
+      const newActive = !currentActive;
+      try {
+        const res = await window.Api.patch(`/admin/categories/${catId}/status`, { active: newActive });
+        if (window.Utils) {
+          window.Utils.showToast(res.message || 'Category status updated.', 'success');
+        }
+        loadCategories();
+      } catch (err) {
+        alert(err.data?.message || err.message || 'Failed to update category status.');
+      }
+    }
+
+    async function deleteCategory(catId, catName, complaintCount) {
+      if (complaintCount > 0) {
+        alert(`Cannot delete category "${catName}" because it is referenced by ${complaintCount} existing complaint record(s). Deactivate it instead to preserve historical records.`);
+        return;
+      }
+
+      if (!confirm(`Are you sure you want to permanently delete category "${catName}"? This action cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        const res = await window.Api.delete(`/admin/categories/${catId}`);
+        if (window.Utils) {
+          window.Utils.showToast(res.message || 'Category deleted successfully.', 'success');
+        }
+        loadCategories();
+      } catch (err) {
+        alert(err.data?.message || err.message || 'Failed to delete category.');
+      }
+    }
+
+    // Provision Staff Modal controls
+    function openProvisionModal() {
+      document.getElementById('modal-provision-staff').style.display = 'flex';
+      document.getElementById('staff-name').focus();
+    }
+
+    function closeProvisionModal() {
+      document.getElementById('modal-provision-staff').style.display = 'none';
+      document.getElementById('provision-staff-form').reset();
+    }
+
+    // DOM Ready initialization and form bindings
     document.addEventListener('DOMContentLoaded', () => {
       checkStatus();
-      loadUserMetrics();
+      loadDashboardStats();
 
-      const form = document.getElementById('provision-staff-form');
-      if (form) {
-        form.addEventListener('submit', async (e) => {
+      // Form: Provision Staff
+      const provForm = document.getElementById('provision-staff-form');
+      if (provForm) {
+        provForm.addEventListener('submit', async (e) => {
           e.preventDefault();
           const submitBtn = document.getElementById('btn-submit-provision');
           const originalText = submitBtn.textContent;
@@ -220,17 +1086,141 @@
             submitBtn.disabled = true;
             submitBtn.textContent = 'Provisioning...';
 
-            const response = await window.Api.post('/users', payload);
+            const response = await window.Api.post('/admin/users', payload);
             if (window.Utils) {
               window.Utils.showToast(response.message || 'Staff account created successfully!', 'success');
             }
-            form.reset();
-            toggleProvisioningModal();
-            loadUserMetrics();
+            closeProvisionModal();
+            loadDashboardStats();
+            if (currentTab === 'users') loadUsers();
           } catch (err) {
             const msg = err.data?.message || err.message || 'Failed to provision staff account.';
             if (window.Utils) {
               window.Utils.showToast(msg, 'danger');
+            } else {
+              alert(msg);
+            }
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+        });
+      }
+
+      // Form: Edit User
+      const editUserForm = document.getElementById('edit-user-form');
+      if (editUserForm) {
+        editUserForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const submitBtn = document.getElementById('btn-save-user');
+          const originalText = submitBtn.textContent;
+          const userId = document.getElementById('edit-user-id').value;
+
+          const payload = {
+            name: document.getElementById('edit-user-name').value.trim(),
+            role: document.getElementById('edit-user-role').value,
+            account_status: document.getElementById('edit-user-status').value,
+            hostel_block: document.getElementById('edit-user-block').value || null,
+            room_number: document.getElementById('edit-user-room').value.trim() || null,
+            phone: document.getElementById('edit-user-phone').value.trim() || null,
+            staff_designation: document.getElementById('edit-user-designation').value.trim() || null
+          };
+
+          try {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+
+            const response = await window.Api.patch(`/admin/users/${userId}`, payload);
+            if (window.Utils) {
+              window.Utils.showToast(response.message || 'User updated successfully!', 'success');
+            }
+            closeEditUserModal();
+            loadUsers();
+            loadDashboardStats();
+          } catch (err) {
+            const msg = err.data?.message || err.message || 'Failed to update user account.';
+            if (window.Utils) {
+              window.Utils.showToast(msg, 'danger');
+            } else {
+              alert(msg);
+            }
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+        });
+      }
+
+      // Form: Add Category
+      const addCatForm = document.getElementById('add-category-form');
+      if (addCatForm) {
+        addCatForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const submitBtn = document.getElementById('btn-create-category');
+          const originalText = submitBtn.textContent;
+
+          const payload = {
+            name: document.getElementById('add-cat-name').value.trim(),
+            description: document.getElementById('add-cat-desc').value.trim() || null,
+            active: document.getElementById('add-cat-active').checked
+          };
+
+          try {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating...';
+
+            const response = await window.Api.post('/admin/categories', payload);
+            if (window.Utils) {
+              window.Utils.showToast(response.message || 'Category created successfully!', 'success');
+            }
+            closeAddCategoryModal();
+            loadCategories();
+            loadDashboardStats();
+          } catch (err) {
+            const msg = err.data?.message || err.message || 'Failed to create category.';
+            if (window.Utils) {
+              window.Utils.showToast(msg, 'danger');
+            } else {
+              alert(msg);
+            }
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+        });
+      }
+
+      // Form: Edit Category
+      const editCatForm = document.getElementById('edit-category-form');
+      if (editCatForm) {
+        editCatForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const submitBtn = document.getElementById('btn-save-category');
+          const originalText = submitBtn.textContent;
+          const catId = document.getElementById('edit-cat-id').value;
+
+          const payload = {
+            name: document.getElementById('edit-cat-name').value.trim(),
+            description: document.getElementById('edit-cat-desc').value.trim() || null,
+            active: document.getElementById('edit-cat-active').checked
+          };
+
+          try {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+
+            const response = await window.Api.patch(`/admin/categories/${catId}`, payload);
+            if (window.Utils) {
+              window.Utils.showToast(response.message || 'Category updated successfully!', 'success');
+            }
+            closeEditCategoryModal();
+            loadCategories();
+          } catch (err) {
+            const msg = err.data?.message || err.message || 'Failed to update category.';
+            if (window.Utils) {
+              window.Utils.showToast(msg, 'danger');
+            } else {
+              alert(msg);
             }
           } finally {
             submitBtn.disabled = false;
@@ -241,5 +1231,5 @@
     });
   </script>
 </body>
-</html>
 
+</html>

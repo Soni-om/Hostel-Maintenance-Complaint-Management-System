@@ -38,31 +38,66 @@ Base URL: `http://localhost:5000/api/v1`
 
 ## 2. Complaint Categories APIs
 
-### 2.1 Get All Categories
+### 2.1 Get Complaint Categories
 - **Method:** `GET`
-- **Endpoint:** `/categories`
+- **Endpoint:** `/categories` (also `/api/categories` and `/api/v1/categories`)
 - **Access:** Authenticated (`Student`, `Staff`, `Admin`)
-- **Success:** `200 OK` $\rightarrow$ `{ success: true, categories: [...] }`
+- **Query Parameters:**
+  - `include_inactive` (boolean, optional, Admin only): If `true` and user is Admin, returns all categories including inactive ones with `complaint_count`. Defaults to returning active-only categories (`active = 1`).
+- **Success:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "categories": [
+      {
+        "id": 1,
+        "name": "Electrical",
+        "description": "Ceiling fans, switchboards, lighting, fuses, power socket malfunctions",
+        "active": 1,
+        "created_at": "2026-11-14T02:07:00.000Z"
+      }
+    ]
+  }
+  ```
 
 ### 2.2 Create Category
 - **Method:** `POST`
-- **Endpoint:** `/categories`
-- **Access:** `Admin`
-- **Body:** `{ name, description }`
-- **Success:** `201 Created` $\rightarrow$ `{ success: true, category }`
+- **Endpoint:** `/categories` or `/admin/categories`
+- **Access:** `Admin` only (Students and Staff forbidden with HTTP 403 `FORBIDDEN_ROLE`)
+- **Body:**
+  ```json
+  {
+    "name": "HVAC & Air Conditioning",
+    "description": "AC cooling, duct repairs, filter replacement, ventilation fans",
+    "active": true
+  }
+  ```
+- **Validation:** `name` is required (2–100 chars), case-insensitive unique constraint enforced. Duplicate returns `409 Conflict` (`DUPLICATE_CATEGORY_NAME`).
+- **Success:** `201 Created` $\rightarrow$ `{ success: true, message: "Complaint category created successfully.", category }`
 
-### 2.3 Update Category
-- **Method:** `PUT`
-- **Endpoint:** `/categories/:id`
-- **Access:** `Admin`
-- **Body:** `{ name, description, is_active }`
-- **Success:** `200 OK` $\rightarrow$ `{ success: true, category }`
+### 2.3 Update Category Details
+- **Method:** `PUT` or `PATCH`
+- **Endpoint:** `/categories/:id` or `/admin/categories/:id`
+- **Access:** `Admin` only
+- **Body:** `{ name, description, active }`
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, message: "Complaint category updated successfully.", category }`
 
-### 2.4 Delete / Deactivate Category
+### 2.4 Toggle Category Active Status
+- **Method:** `PATCH`
+- **Endpoint:** `/categories/:id/status` or `/admin/categories/:id/status`
+- **Access:** `Admin` only
+- **Body:** `{ active: false }` or `{ status: "inactive" }`
+- **Behavior:** Inactive categories are excluded from resident ticket submission dropdowns while preserving existing historical complaint associations.
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, message: "Category '...' status updated to inactive.", category }`
+
+### 2.5 Safe Delete Category
 - **Method:** `DELETE`
-- **Endpoint:** `/categories/:id`
-- **Access:** `Admin`
-- **Success:** `200 OK` $\rightarrow$ `{ success: true, message }`
+- **Endpoint:** `/categories/:id` or `/admin/categories/:id`
+- **Access:** `Admin` only
+- **Integrity Rule:** If the category is referenced by one or more complaints (`complaint_count > 0`), deletion is strictly rejected with `409 Conflict` (`CATEGORY_IN_USE`) to preserve foreign key constraints and historical audit trails. Categories with 0 complaints can be safely deleted.
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, message: "Complaint category '...' deleted successfully." }`
+- **Errors:**
+  - `409 Conflict`: Category is referenced by existing complaints (`code: "CATEGORY_IN_USE"`). Deactivation is recommended.
 
 ---
 
@@ -610,9 +645,87 @@ Base URL: `http://localhost:5000/api/v1`
 
 ## 7. Analytics & Dashboard Statistics APIs
 
-### 6.1 Dashboard Overview Metrics
+### 7.1 Dashboard Overview Metrics
 - **Method:** `GET`
 - **Endpoint:** `/stats/dashboard`
 - **Access:** Authenticated (Data dynamically scoped to Student/Staff/Admin context)
 - **Success:** `200 OK` $\rightarrow$ `{ success: true, stats: { total, pending, in_progress, resolved, closed, avg_resolution_hours } }`
+
+---
+
+## 8. Administrator Management & Governance APIs
+
+### 8.1 List System Users
+- **Method:** `GET`
+- **Endpoint:** `/admin/users` (also `/users` and `/api/v1/admin/users`)
+- **Access:** `Admin` only (Students and Staff receive HTTP 403 `FORBIDDEN_ROLE`)
+- **Query Parameters:**
+  - `role` (`student`, `staff`, `admin`)
+  - `status` (`active`, `inactive`)
+  - `search` (keyword matched against name or email)
+  - `page` (positive integer, default 1)
+  - `limit` (integer 1–50, default 10)
+- **Security:** Never returns `password_hash`.
+- **Success:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "users": [
+      {
+        "id": 1,
+        "name": "Chief Warden Sharma",
+        "email": "admin@hostelcare.edu",
+        "role": "admin",
+        "account_status": "active",
+        "phone": "+91 9811002233"
+      }
+    ],
+    "pagination": { "page": 1, "limit": 10, "total": 8, "totalPages": 1 }
+  }
+  ```
+
+### 8.2 Get User Account by ID
+- **Method:** `GET`
+- **Endpoint:** `/admin/users/:id` (also `/users/:id`)
+- **Access:** `Admin` only
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, user }` (excludes `password_hash`)
+- **Errors:** `404 Not Found` if user does not exist.
+
+### 8.3 Update User Account Details
+- **Method:** `PATCH`
+- **Endpoint:** `/admin/users/:id` (also `/users/:id`)
+- **Access:** `Admin` only
+- **Body:** `{ name, phone, role, account_status, staff_designation, hostel_block, room_number }`
+- **Guards:**
+  - **Self-Deactivation Guard:** Administrators cannot deactivate their own active account (`400 SELF_DEACTIVATION_DENIED`).
+  - **Last Active Admin Guard:** Cannot deactivate or demote the last active Administrator account away from `admin` (`400 CANNOT_DISABLE_LAST_ADMIN`).
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, message: "User account updated successfully.", user }`
+
+### 8.4 Toggle User Account Status
+- **Method:** `PATCH`
+- **Endpoint:** `/admin/users/:id/status` (also `/users/:id/status`)
+- **Access:** `Admin` only
+- **Body:** `{ account_status: "inactive" }`
+- **Guards:**
+  - Rejects self-deactivation (`400 SELF_DEACTIVATION_DENIED`).
+  - Rejects deactivating the last active Admin account (`400 CANNOT_DISABLE_LAST_ADMIN`).
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, message: "Account status updated to 'inactive' successfully.", user }`
+
+### 8.5 Administrator Dashboard Live Analytics
+- **Method:** `GET`
+- **Endpoint:** `/admin/stats` or `/admin/dashboard`
+- **Access:** `Admin` only
+- **Metrics Computed from Live MySQL Database:**
+  - `complaints`: Counts broken down by status (`total`, `pending`, `assigned`, `in_progress`, `resolved`, `closed`).
+  - `priorities`: Counts by priority (`low`, `normal`, `high`, `urgent`).
+  - `users`: Counts by role (`total`, `students`, `staff`, `active_staff`, `admins`, `inactive`).
+  - `performance`: SLA statistics (`resolved_total`, `avg_resolution_hours`).
+  - `feedback`: Student feedback analytics (`total`, `avg_rating`, star distribution 1–5).
+  - `categories`: All categories with associated complaint counts.
+  - `blocks`: Complaint counts per hostel block.
+  - `recent_complaints`: Latest 10 complaints with student, category, and ticket info.
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, stats: { complaints, priorities, users, performance, feedback, categories, blocks, recent_complaints } }`
+- **Errors:**
+  - `401 Unauthorized`: Missing or invalid Bearer JWT.
+  - `403 Forbidden`: Non-admin role (`FORBIDDEN_ROLE`).
 

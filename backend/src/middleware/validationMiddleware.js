@@ -629,3 +629,118 @@ export const validateSubmitFeedbackRules = [
 
   handleValidationErrors
 ];
+
+/**
+ * Validation rules for Complaint Category Creation (POST /api/categories or /api/admin/categories)
+ */
+export const validateCategoryCreationRules = [
+  body('name')
+    .isString().withMessage('Category name must be a string.')
+    .trim()
+    .notEmpty().withMessage('Category name is required.')
+    .isLength({ min: 2, max: 100 }).withMessage('Category name must be between 2 and 100 characters.'),
+
+  body('description')
+    .optional({ nullable: true })
+    .isString().withMessage('Category description must be a string if provided.')
+    .trim()
+    .isLength({ max: 255 }).withMessage('Category description cannot exceed 255 characters.'),
+
+  body('active')
+    .optional({ nullable: true })
+    .custom((val) => {
+      if (val !== undefined && typeof val !== 'boolean' && typeof val !== 'number' && val !== '0' && val !== '1' && val !== 'active' && val !== 'inactive') {
+        throw new Error("Active must be a boolean, number (1/0), or 'active'/'inactive'.");
+      }
+      return true;
+    }),
+
+  handleValidationErrors
+];
+
+/**
+ * Validation rules for Complaint Category Update (PUT/PATCH /api/categories/:id or /api/admin/categories/:id)
+ */
+export const validateCategoryUpdateRules = [
+  param('id')
+    .notEmpty().withMessage('Category ID is required.')
+    .isInt({ min: 1 }).withMessage('Category ID must be a valid positive integer.')
+    .toInt(),
+
+  body('name')
+    .optional({ nullable: true })
+    .isString().withMessage('Category name must be a string.')
+    .trim()
+    .isLength({ min: 2, max: 100 }).withMessage('Category name must be between 2 and 100 characters.'),
+
+  body('description')
+    .optional({ nullable: true })
+    .isString().withMessage('Category description must be a string if provided.')
+    .trim()
+    .isLength({ max: 255 }).withMessage('Category description cannot exceed 255 characters.'),
+
+  body('active')
+    .optional({ nullable: true })
+    .custom((val) => {
+      if (val !== undefined && typeof val !== 'boolean' && typeof val !== 'number' && val !== '0' && val !== '1' && val !== 'active' && val !== 'inactive') {
+        throw new Error("Active must be a boolean, number (1/0), or 'active'/'inactive'.");
+      }
+      return true;
+    }),
+
+  handleValidationErrors
+];
+
+/**
+ * Validation rules for Admin User Update (PATCH /api/users/:id or /api/admin/users/:id)
+ */
+export const validateUserUpdateRules = [
+  param('id')
+    .notEmpty().withMessage('User ID is required.')
+    .isInt({ min: 1 }).withMessage('User ID must be a valid positive integer.')
+    .toInt(),
+
+  body('role')
+    .optional({ nullable: true })
+    .isString().withMessage('Role must be a string.')
+    .trim()
+    .isIn(['student', 'staff', 'admin']).withMessage("Role must be 'student', 'staff', or 'admin'."),
+
+  body('account_status')
+    .optional({ nullable: true })
+    .isString().withMessage('Account status must be a string.')
+    .trim()
+    .isIn(['active', 'inactive']).withMessage("Account status must be 'active' or 'inactive'."),
+
+  body('name')
+    .optional({ nullable: true })
+    .isString().withMessage('Name must be a string.')
+    .trim()
+    .isLength({ min: 2, max: 100 }).withMessage('Name must be between 2 and 100 characters.'),
+
+  body('phone')
+    .optional({ nullable: true })
+    .isString().withMessage('Phone must be a string if provided.')
+    .trim()
+    .isLength({ max: 20 }).withMessage('Phone cannot exceed 20 characters.'),
+
+  body('staff_designation')
+    .optional({ nullable: true })
+    .isString().withMessage('Staff designation must be a string if provided.')
+    .trim()
+    .isLength({ max: 100 }).withMessage('Staff designation cannot exceed 100 characters.'),
+
+  body('hostel_block')
+    .optional({ nullable: true })
+    .isString().withMessage('Hostel block must be a string if provided.')
+    .trim()
+    .isLength({ max: 50 }).withMessage('Hostel block cannot exceed 50 characters.'),
+
+  body('room_number')
+    .optional({ nullable: true })
+    .isString().withMessage('Room number must be a string if provided.')
+    .trim()
+    .isLength({ max: 20 }).withMessage('Room number cannot exceed 20 characters.'),
+
+  handleValidationErrors
+];

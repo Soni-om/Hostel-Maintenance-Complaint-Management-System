@@ -14,6 +14,7 @@ import userRoutes from './routes/userRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import complaintRoutes from './routes/complaintRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -149,6 +150,10 @@ app.use(`${apiPrefix}/categories`, categoryRoutes);
 // Maintenance Complaints (Student submission)
 app.use('/api/complaints', complaintRoutes);
 app.use(`${apiPrefix}/complaints`, complaintRoutes);
+
+// Administrator Operations & System Governance (Admin only)
+app.use('/api/admin', adminRoutes);
+app.use(`${apiPrefix}/admin`, adminRoutes);
 
 // ==========================================
 // 5. Centralized 404 Route Handler

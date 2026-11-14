@@ -197,6 +197,82 @@ const UserModel = {
   },
 
   /**
+   * Counts currently active Administrator accounts
+   * Used to enforce guard against disabling or demoting the last active admin
+   * @returns {Promise<number>}
+   */
+  async countActiveAdmins() {
+    const [rows] = await pool.query(
+      `SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND account_status = 'active'`
+    );
+    return Number(rows[0]?.count || 0);
+  },
+
+  /**
+   * Updates multiple user fields (Admin governance)
+   * @param {number} id
+   * @param {object} fields
+   * @returns {Promise<object|null>}
+   */
+  async updateUser(id, fields = {}) {
+    const updates = [];
+    const params = [];
+
+    if (fields.name !== undefined) {
+      updates.push('name = ?');
+      params.push(fields.name.trim());
+    }
+
+    if (fields.phone !== undefined) {
+      updates.push('phone = ?');
+      params.push(fields.phone ? fields.phone.trim() : null);
+    }
+
+    if (fields.role !== undefined) {
+      updates.push('role = ?');
+      params.push(fields.role.trim().toLowerCase());
+    }
+
+    if (fields.account_status !== undefined || fields.status !== undefined) {
+      const statusVal = fields.account_status || fields.status;
+      updates.push('account_status = ?');
+      params.push(statusVal.trim().toLowerCase());
+    }
+
+    if (fields.staff_designation !== undefined) {
+      updates.push('staff_designation = ?');
+      params.push(fields.staff_designation ? fields.staff_designation.trim() : null);
+    }
+
+    if (fields.room_number !== undefined) {
+      updates.push('room_number = ?');
+      params.push(fields.room_number ? fields.room_number.trim() : null);
+    }
+
+    if (fields.hostel_block !== undefined) {
+      let blockId = null;
+      if (fields.hostel_block) {
+        const matched = await this.findBlock(fields.hostel_block);
+        if (matched) blockId = matched.id;
+      }
+      updates.push('hostel_block = ?');
+      params.push(fields.hostel_block ? fields.hostel_block.trim() : null);
+      updates.push('block_id = ?');
+      params.push(blockId);
+    }
+
+    if (updates.length > 0) {
+      params.push(id);
+      await pool.execute(
+        `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+        params
+      );
+    }
+
+    return this.findById(id);
+  },
+
+  /**
    * Retrieves all active maintenance staff accounts
    * @returns {Promise<Array<object>>}
    */
