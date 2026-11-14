@@ -1,0 +1,141 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/frontend/index.html"
+    },
+    {
+      "source": "/index.html",
+      "destination": "/frontend/index.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/frontend/pages/auth/login.html"
+    },
+    {
+      "source": "/login.html",
+      "destination": "/frontend/pages/auth/login.html"
+    },
+    {
+      "source": "/register",
+      "destination": "/frontend/pages/auth/register.html"
+    },
+    {
+      "source": "/register.html",
+      "destination": "/frontend/pages/auth/register.html"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/frontend/pages/student/dashboard.html"
+    },
+    {
+      "source": "/dashboard.html",
+      "destination": "/frontend/pages/student/dashboard.html"
+    },
+    {
+      "source": "/complaints",
+      "destination": "/frontend/pages/student/complaints.html"
+    },
+    {
+      "source": "/complaints.html",
+      "destination": "/frontend/pages/student/complaints.html"
+    },
+    {
+      "source": "/new-complaint",
+      "destination": "/frontend/pages/student/new-complaint.html"
+    },
+    {
+      "source": "/new-complaint.html",
+      "destination": "/frontend/pages/student/new-complaint.html"
+    },
+    {
+      "source": "/complaint-details",
+      "destination": "/frontend/pages/student/complaint-details.html"
+    },
+    {
+      "source": "/complaint-details.html",
+      "destination": "/frontend/pages/student/complaint-details.html"
+    },
+    {
+      "source": "/staff/dashboard",
+      "destination": "/frontend/pages/staff/dashboard.html"
+    },
+    {
+      "source": "/staff/dashboard.html",
+      "destination": "/frontend/pages/staff/dashboard.html"
+    },
+    {
+      "source": "/admin/dashboard",
+      "destination": "/frontend/pages/admin/dashboard.html"
+    },
+    {
+      "source": "/admin/dashboard.html",
+      "destination": "/frontend/pages/admin/dashboard.html"
+    },
+    {
+      "source": "/pages/:match*",
+      "destination": "/frontend/pages/:match*"
+    },
+    {
+      "source": "/assets/:match*",
+      "destination": "/frontend/assets/:match*"
+    },
+    {
+      "source": "/css/:match*",
+      "destination": "/frontend/css/:match*"
+    },
+    {
+      "source": "/js/:match*",
+      "destination": "/frontend/js/:match*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/:match*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/css/:match*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/js/:match*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/:match*",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ]
+}

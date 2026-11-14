@@ -82,10 +82,15 @@ const Api = {
       } else if (window.CONFIG?.DB_HEALTH_URL && endpoint === '/api/health/db') {
         url = window.CONFIG.DB_HEALTH_URL;
       } else {
-        const origin = (typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null')
-          ? window.location.origin
-          : 'http://localhost:5000';
-        url = `${origin}${endpoint}`;
+        let backendOrigin = 'http://localhost:5000';
+        try {
+          if (baseUrl.startsWith('http://') || baseUrl.startsWith('https://')) {
+            backendOrigin = new URL(baseUrl).origin;
+          } else if (typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null') {
+            backendOrigin = window.location.origin;
+          }
+        } catch {}
+        url = `${backendOrigin}${endpoint}`;
       }
     } else {
       url = `${baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
@@ -195,10 +200,15 @@ const Api = {
     if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
       url = endpoint;
     } else if (endpoint.startsWith('/api/')) {
-      const origin = (typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null')
-        ? window.location.origin
-        : 'http://localhost:5000';
-      url = `${origin}${endpoint}`;
+      let backendOrigin = 'http://localhost:5000';
+      try {
+        if (baseUrl.startsWith('http://') || baseUrl.startsWith('https://')) {
+          backendOrigin = new URL(baseUrl).origin;
+        } else if (typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null') {
+          backendOrigin = window.location.origin;
+        }
+      } catch {}
+      url = `${backendOrigin}${endpoint}`;
     } else {
       url = `${baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
     }

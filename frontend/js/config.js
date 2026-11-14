@@ -3,9 +3,19 @@
  * Central configuration for API endpoints, storage keys, and environment detection
  */
 
+const PRODUCTION_API_ORIGIN = 'https://backend-production-84d31806.up.railway.app';
+const LOCAL_DEV_ORIGIN = 'http://localhost:5000';
+
+/**
+ * Resolves the backend API origin based on runtime environment.
+ * - Localhost / 127.0.0.1: routes to local development server (http://localhost:5000).
+ * - Cloud / Vercel: routes to production Railway backend (https://backend-production-84d31806.up.railway.app).
+ * - window.__API_BASE_URL__: explicit global override takes precedence if set.
+ * @returns {string} Fully qualified origin without trailing slash
+ */
 function resolveApiOrigin() {
   if (typeof window === 'undefined') {
-    return 'http://localhost:5000';
+    return LOCAL_DEV_ORIGIN;
   }
   // 1. Explicit global override for flexible multi-environment or CDN deployment
   if (window.__API_BASE_URL__) {
@@ -13,13 +23,24 @@ function resolveApiOrigin() {
   }
   // 2. If opened directly via file:// protocol, fallback to standard localhost:5000 backend
   if (window.location && window.location.protocol === 'file:') {
-    return 'http://localhost:5000';
+    return LOCAL_DEV_ORIGIN;
   }
-  // 3. Dynamic origin detection (works across any host, port, protocol, or reverse proxy)
-  if (window.location && window.location.origin && window.location.origin !== 'null') {
+  // 3. Localhost development environments
+  const hostname = window.location ? (window.location.hostname || '').toLowerCase() : '';
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname.endsWith('.local');
+  if (isLocalhost) {
+    if (window.location.port === '5000') {
+      return window.location.origin;
+    }
+    return LOCAL_DEV_ORIGIN;
+  }
+  // 4. Same-origin cloud deployment (e.g. if served directly from Railway backend)
+  if (window.location && window.location.origin && window.location.origin.includes('backend-production-84d31806.up.railway.app')) {
     return window.location.origin;
   }
-  return 'http://localhost:5000';
+  // 5. Cloud static frontend deployment (e.g. Vercel, Netlify, or custom domain)
+  // Directs API traffic to the production Railway Express backend
+  return PRODUCTION_API_ORIGIN;
 }
 
 const baseOrigin = resolveApiOrigin();
