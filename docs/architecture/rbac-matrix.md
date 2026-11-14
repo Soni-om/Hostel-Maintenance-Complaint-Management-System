@@ -43,6 +43,7 @@
 | **Admin: Live Statistics** | `GET /api/v1/admin/stats` or `GET /api/v1/admin/dashboard` | ❌ | ❌ | ✅ | Admin only. Real database metrics: complaints, users, SLA, and feedback. |
 | **Staff: Operations Overview** | `GET /api/v1/staff/overview` | ❌ | ✅ | ✅ | Staff & Admin only. Maintenance queue overview. |
 | **Staff: Complaints Queue** | `GET /api/v1/staff/complaints` | ❌ | ✅ | ✅ | Staff & Admin only. Option D visibility, keyword search, status/cat/priority/date filters, pagination, and real-time DB stats. |
+| **Staff: View Ticket Details** | `GET /api/v1/staff/complaints/:id` | ❌ | ✅ | ✅ | Staff & Admin only. Option D hybrid visibility (own block or active assignment; 404 anti-enumeration otherwise). |
 | **Stats: Dashboard** | `GET /api/v1/stats/dashboard` | ✅ | ✅ | ✅ | Scoped dynamically per role context. |
 
 ---
@@ -69,6 +70,8 @@
 | `GET` | `/api/v1/staff/overview` | Bearer JWT | `staff`, `admin` | Maintenance staff dashboard metrics. Students forbidden (403). | `200`, `401`, `403` |
 | `GET` | `/api/v1/staff/technicians` | Bearer JWT | `staff`, `admin` | Active technicians directory (`role = 'staff'`, `account_status = 'active'`). Excludes students and admin. | `200`, `401`, `403` |
 | `GET` | `/api/v1/staff/complaints` | Bearer JWT | `staff`, `admin` | Option D hybrid visibility. Keyword search, multi-field filters, pagination, and real stats. Students forbidden (403). | `200`, `400`, `401`, `403` |
+| `GET` | `/api/v1/staff/complaints/:id` | Bearer JWT | `staff`, `admin` | Option D hybrid visibility. Students forbidden (403). Non-permitted cross-hostel returns uniform 404 anti-enumeration. | `200`, `400`, `401`, `403`, `404` |
+| `GET` | `/api/v1/stats/dashboard` | Bearer JWT | `student`, `staff`, `admin` | Dynamically returns role-scoped dashboard metrics computed from live database aggregates. | `200`, `401` |
 | `POST` | `/api/v1/staff/complaints/:id/assign` | Bearer JWT | `staff`, `admin` | Assigns or reassigns complaint. Option D scope. Validates active staff role (rejects students & inactive staff with 400). Atomic ACID transaction, FOR UPDATE lock, moves Pending to Assigned. | `200`, `400`, `401`, `403`, `404` |
 | `GET` | `/api/v1/staff/complaints/:id/assignments` | Bearer JWT | `staff`, `admin` | Chronological assignment history and delegation audit timeline. Option D anti-enumeration (404). | `200`, `400`, `401`, `403`, `404` |
 | `POST` | `/api/v1/complaints` | Bearer JWT | `student` | Students only. Auto-assigned ticket `HC-YYYYMMDD-XXXX`. | `201`, `400`, `401`, `403` |

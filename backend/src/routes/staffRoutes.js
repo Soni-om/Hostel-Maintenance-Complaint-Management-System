@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
 import StaffController from '../controllers/staffController.js';
+import ComplaintModel from '../models/complaintModel.js';
 import {
   validateStaffComplaintQueryRules,
   validateComplaintAssignmentRules,
@@ -24,18 +25,28 @@ router.use(requireAuth);
  * @desc    Get staff operational overview & queue summary
  * @access  Staff and Admin only (Students strictly forbidden)
  */
-router.get('/overview', requireRole('staff', 'admin'), (req, res) => {
-  return res.status(200).json({
-    success: true,
-    message: 'Staff maintenance operations overview loaded.',
-    data: {
-      staffName: req.user.name,
-      role: req.user.role,
-      designation: req.user.staff_designation || 'Maintenance Staff',
-      assignedHostel: req.user.hostel_block || 'All Blocks',
-      activeQueueCount: 0
-    }
-  });
+router.get('/overview', requireRole('staff', 'admin'), async (req, res) => {
+  try {
+    const stats = await ComplaintModel.getStaffComplaintStats({ user: req.user });
+    return res.status(200).json({
+      success: true,
+      message: 'Staff maintenance operations overview loaded.',
+      data: {
+        staffName: req.user.name,
+        role: req.user.role,
+        designation: req.user.staff_designation || 'Maintenance Staff',
+        assignedHostel: req.user.hostel_block || 'All Blocks',
+        activeQueueCount: stats.totalPermitted,
+        stats
+      }
+    });
+  } catch (err) {
+    console.error('Staff overview error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load staff operations overview.'
+    });
+  }
 });
 
 /**
@@ -55,6 +66,18 @@ router.get(
   requireRole('staff', 'admin'),
   validateStaffComplaintQueryRules,
   StaffController.getStaffComplaints
+);
+
+/**
+ * @route   GET /api/staff/complaints/:id or /api/v1/staff/complaints/:id
+ * @desc    Get detailed information for a complaint under Option D visibility
+ * @access  Staff and Admin only
+ */
+router.get(
+  '/complaints/:id',
+  requireRole('staff', 'admin'),
+  validateComplaintIdRules,
+  StaffController.getComplaintById
 );
 
 /**

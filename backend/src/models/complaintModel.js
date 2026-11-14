@@ -277,6 +277,36 @@ const ComplaintModel = {
   },
 
   /**
+   * Retrieves live complaint counts aggregated by status for a specific student
+   * @param {number} studentId
+   * @returns {Promise<{ total: number, pending: number, assigned: number, in_progress: number, resolved: number, closed: number }>}
+   */
+  async getStudentComplaintStats(studentId) {
+    const [rows] = await pool.query(
+      `SELECT
+        COUNT(*) AS total,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending,
+        COUNT(CASE WHEN status = 'assigned' THEN 1 END) AS assigned,
+        COUNT(CASE WHEN status = 'in_progress' THEN 1 END) AS in_progress,
+        COUNT(CASE WHEN status = 'resolved' THEN 1 END) AS resolved,
+        COUNT(CASE WHEN status = 'closed' THEN 1 END) AS closed
+       FROM complaints
+       WHERE student_id = ?`,
+      [studentId]
+    );
+
+    const row = rows[0] || {};
+    return {
+      total: Number(row.total || 0),
+      pending: Number(row.pending || 0),
+      assigned: Number(row.assigned || 0),
+      in_progress: Number(row.in_progress || 0),
+      resolved: Number(row.resolved || 0),
+      closed: Number(row.closed || 0)
+    };
+  },
+
+  /**
    * Finds a single complaint by ID ensuring student ownership
    * Retrieves category name and latest remarks from complaint_status_history
    * 

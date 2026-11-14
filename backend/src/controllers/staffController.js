@@ -70,6 +70,63 @@ const StaffController = {
   },
 
   /**
+   * Retrieves single complaint details for staff/admin under Option D visibility
+   * GET /api/staff/complaints/:id or /api/v1/staff/complaints/:id
+   * Access: Staff and Admin only
+   */
+  async getComplaintById(req, res) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+      if (isNaN(complaintId) || complaintId <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid complaint ID specified.'
+        });
+      }
+
+      const complaint = await ComplaintModel.findById(complaintId);
+      if (!complaint) {
+        return res.status(404).json({
+          success: false,
+          message: 'Complaint not found.'
+        });
+      }
+
+      if (req.user.role === 'staff') {
+        const hasBlockAccess = Boolean(
+          req.user.hostel_block &&
+          req.user.hostel_block.trim() &&
+          complaint.hostel_block &&
+          complaint.hostel_block.trim().toLowerCase() === req.user.hostel_block.trim().toLowerCase()
+        );
+
+        let hasActiveAssignment = false;
+        if (!hasBlockAccess) {
+          hasActiveAssignment = await ComplaintModel.isComplaintAssignedToStaff(complaintId, req.user.id);
+        }
+
+        if (!hasBlockAccess && !hasActiveAssignment) {
+          return res.status(404).json({
+            success: false,
+            message: 'Complaint not found.'
+          });
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        complaint
+      });
+    } catch (error) {
+      console.error('Staff getComplaintById Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve complaint details.'
+      });
+    }
+  },
+
+  /**
    * Assigns or reassigns a complaint to an active maintenance staff member
    * POST /api/staff/complaints/:id/assign or /api/v1/staff/complaints/:id/assign
    * Access: Staff and Admin only

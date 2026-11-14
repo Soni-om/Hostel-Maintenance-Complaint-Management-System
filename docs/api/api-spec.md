@@ -641,6 +641,34 @@ Base URL: `http://localhost:5000/api/v1`
   - `403 Forbidden`: Authenticated user is a student (`FORBIDDEN_ROLE`).
   - `404 Not Found`: Complaint not found or Option D anti-enumeration.
 
+### 6.6 Single Complaint Details for Maintenance Staff
+- **Method:** `GET`
+- **Endpoint:** `/staff/complaints/:id` (also `/api/v1/staff/complaints/:id`)
+- **Access:** `Staff`, `Admin` (Students forbidden with HTTP 403 `FORBIDDEN_ROLE`)
+- **Authorization:** Scoped via Option D Hybrid Visibility policy (returns uniform HTTP 404 anti-enumeration for non-permitted cross-hostel attempts).
+- **Success:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "complaint": {
+      "id": 1,
+      "ticket_number": "HC-20261101-0001",
+      "title": "Ceiling fan regulator burnt and sparking",
+      "description": "The fan regulator in room A-102 caught fire with sparks...",
+      "status": "in_progress",
+      "priority": "normal",
+      "hostel_block": "Block A",
+      "room_number": "A-102",
+      "created_at": "2026-11-01T04:45:00.000Z"
+    }
+  }
+  ```
+- **Errors:**
+  - `400 Bad Request`: Invalid `:id` parameter format.
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `403 Forbidden`: Authenticated user is a student (`FORBIDDEN_ROLE`).
+  - `404 Not Found`: Complaint not found or Option D anti-enumeration block.
+
 ---
 
 ## 7. Analytics & Dashboard Statistics APIs

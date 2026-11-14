@@ -217,25 +217,19 @@
       tableContainer.style.display = 'none';
 
       try {
-        // Fetch up to 50 recent complaints to compute KPI metric counters accurately
-        const res = await window.Api.get('/complaints/mine?limit=50');
-        const complaints = res.complaints || [];
-        const total = (res.pagination && typeof res.pagination.total === 'number')
-          ? res.pagination.total
-          : complaints.length;
+        // Fetch live SQL aggregates and recent complaints in parallel
+        const [statsRes, complaintsRes] = await Promise.all([
+          window.Api.get('/stats/dashboard', { silent: true }).catch(() => null),
+          window.Api.get('/complaints/mine?limit=50', { silent: true }).catch(() => null)
+        ]);
 
-        // Compute metrics
-        let countInProgress = 0;
-        let countResolved = 0;
-        let countPending = 0;
+        const complaints = complaintsRes?.complaints || [];
+        const total = statsRes?.stats?.total ?? complaintsRes?.pagination?.total ?? complaints.length;
+        const countInProgress = statsRes?.stats?.in_progress ?? complaints.filter(c => c.status === 'in_progress').length;
+        const countResolved = statsRes?.stats?.resolved ?? complaints.filter(c => c.status === 'resolved').length;
+        const countPending = statsRes?.stats?.pending ?? complaints.filter(c => c.status === 'pending').length;
 
-        complaints.forEach(item => {
-          if (item.status === 'in_progress') countInProgress++;
-          else if (item.status === 'resolved') countResolved++;
-          else if (item.status === 'pending') countPending++;
-        });
-
-        // Update KPI cards
+        // Update KPI cards with live SQL aggregates
         document.getElementById('stat-total').textContent = total;
         document.getElementById('stat-inprogress').textContent = countInProgress;
         document.getElementById('stat-resolved').textContent = countResolved;
