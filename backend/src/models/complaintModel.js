@@ -912,6 +912,494 @@ const ComplaintModel = {
       ...r,
       is_active: Boolean(r.is_active)
     }));
+  },
+
+  /**
+   * Updates complaint status through verified lifecycle transition rules
+   * Executes inside an ACID transaction with FOR UPDATE row locking and status history logging
+   *
+   * @param {object} params
+   * @param {number} params.complaintId
+   * @param {string} params.newStatus
+   * @param {string} [params.remarks]
+   * @param {object} params.user - Authenticated user context { id, role, hostel_block }
+   * @returns {Promise<object>} Updated complaint and transition details
+   */
+  async updateStatus({ complaintId, newStatus, remarks, user }) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Fetch current complaint with pessimistic row lock
+      const [rows] = await connection.query(
+        `SELECT id, ticket_number, student_id, category_id, title, hostel_block,
+                room_number, priority, status, resolved_at, created_at
+         FROM complaints
+         WHERE id = ?
+         FOR UPDATE`,
+        [complaintId]
+      );
+
+      if (rows.length === 0) {
+        const err = new Error('Complaint not found.');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const complaint = rows[0];
+      const currentStatus = complaint.status;
+      const targetStatus = String(newStatus).toLowerCase().trim();
+
+      // 2. Enforce Option D Hybrid Visibility Policy for staff / Ownership for student
+      if (user.role === 'staff') {
+        const hasBlockAccess = Boolean(
+          user.hostel_block &&
+          user.hostel_block.trim() &&
+          complaint.hostel_block &&
+          complaint.hostel_block.trim().toLowerCase() === user.hostel_block.trim().toLowerCase()
+        );
+
+        let hasActiveAssignment = false;
+        if (!hasBlockAccess) {
+          const [assignCheck] = await connection.query(
+            `SELECT id FROM complaint_assignments
+             WHERE complaint_id = ? AND staff_id = ? AND unassigned_at IS NULL
+             LIMIT 1`,
+            [complaintId, user.id]
+          );
+          hasActiveAssignment = assignCheck.length > 0;
+        }
+
+        if (!hasBlockAccess && !hasActiveAssignment) {
+          const err = new Error('Complaint not found.');
+          err.statusCode = 404;
+          throw err;
+        }
+      } else if (user.role === 'student') {
+        if (complaint.student_id !== user.id) {
+          const err = new Error('Complaint not found.');
+          err.statusCode = 404;
+          throw err;
+        }
+      }
+
+      // 3. Prevent no-op transitions
+      if (currentStatus === targetStatus) {
+        const err = new Error(`Complaint is already in '${targetStatus}' status.`);
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // 4. Role-based transition authorization
+      if (user.role === 'student') {
+        if (currentStatus === 'resolved' && (targetStatus === 'closed' || targetStatus === 'in_progress')) {
+          // Permitted student actions: close or reopen a resolved complaint
+        } else {
+          const err = new Error("Access denied: Students can only close or reopen complaints in 'resolved' status.");
+          err.statusCode = 403;
+          throw err;
+        }
+      }
+
+      // 5. Allowed lifecycle transition rules state machine
+      const ALLOWED_TRANSITIONS = {
+        pending: ['assigned', 'in_progress'],
+        assigned: ['in_progress', 'pending'],
+        in_progress: ['resolved', 'assigned'],
+        resolved: ['closed', 'in_progress'],
+        closed: ['in_progress'] // Reopening from closed is Admin-only
+      };
+
+      const allowedNext = ALLOWED_TRANSITIONS[currentStatus] || [];
+      if (!allowedNext.includes(targetStatus)) {
+        const err = new Error(
+          `Invalid status transition from '${currentStatus}' to '${targetStatus}'. Allowed transitions: ${allowedNext.length > 0 ? allowedNext.join(', ') : 'none'}.`
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // 6. Terminal closed state check: Only Admin can reopen a closed ticket
+      if (currentStatus === 'closed' && user.role !== 'admin') {
+        const err = new Error('Cannot change status of a closed complaint. Closed tickets can only be reopened by an Administrator.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // 7. Compulsory remarks validation
+      if (targetStatus === 'resolved') {
+        if (!remarks || !remarks.trim()) {
+          const err = new Error('Resolution remarks are required when marking a complaint as resolved.');
+          err.statusCode = 400;
+          throw err;
+        }
+      }
+
+      if (currentStatus === 'resolved' && targetStatus === 'in_progress') {
+        if (!remarks || !remarks.trim()) {
+          const err = new Error('A reason or remark is required when reopening a complaint.');
+          err.statusCode = 400;
+          throw err;
+        }
+      }
+
+      // 8. Update complaint in MySQL
+      let resolvedAtSql = '';
+      if (targetStatus === 'resolved') {
+        resolvedAtSql = ', resolved_at = CURRENT_TIMESTAMP';
+      } else if (currentStatus === 'resolved' && targetStatus !== 'resolved') {
+        resolvedAtSql = ', resolved_at = NULL';
+      }
+
+      await connection.query(
+        `UPDATE complaints
+         SET status = ? ${resolvedAtSql}, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [targetStatus, complaintId]
+      );
+
+      // 9. Record status history audit entry
+      const cleanRemarks = remarks && remarks.trim() ? remarks.trim() : null;
+      const [historyResult] = await connection.execute(
+        `INSERT INTO complaint_status_history (
+           complaint_id, changed_by, old_status, new_status, remarks, changed_at
+         ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [complaintId, user.id, currentStatus, targetStatus, cleanRemarks]
+      );
+
+      await connection.commit();
+
+      return {
+        id: complaintId,
+        ticket_number: complaint.ticket_number,
+        old_status: currentStatus,
+        status: targetStatus,
+        resolved_at: targetStatus === 'resolved' ? new Date().toISOString() : null,
+        history_id: historyResult.insertId,
+        remarks: cleanRemarks
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  /**
+   * Updates complaint priority level with RBAC enforcement and audit trail
+   *
+   * @param {object} params
+   * @param {number} params.complaintId
+   * @param {string} params.newPriority - 'low', 'normal', 'high', 'urgent'
+   * @param {string} [params.remarks]
+   * @param {object} params.user - Authenticated user context
+   * @returns {Promise<object>} Updated complaint details
+   */
+  async updatePriority({ complaintId, newPriority, remarks, user }) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Fetch current complaint with row lock
+      const [rows] = await connection.query(
+        `SELECT id, ticket_number, student_id, hostel_block, priority, status
+         FROM complaints
+         WHERE id = ?
+         FOR UPDATE`,
+        [complaintId]
+      );
+
+      if (rows.length === 0) {
+        const err = new Error('Complaint not found.');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const complaint = rows[0];
+
+      // 2. RBAC: Only staff and admin can update priority
+      if (user.role === 'student') {
+        const err = new Error('Access denied. Insufficient permissions to update complaint priority.');
+        err.statusCode = 403;
+        throw err;
+      }
+
+      // 3. Option D check for staff
+      if (user.role === 'staff') {
+        const hasBlockAccess = Boolean(
+          user.hostel_block &&
+          user.hostel_block.trim() &&
+          complaint.hostel_block &&
+          complaint.hostel_block.trim().toLowerCase() === user.hostel_block.trim().toLowerCase()
+        );
+
+        let hasActiveAssignment = false;
+        if (!hasBlockAccess) {
+          const [assignCheck] = await connection.query(
+            `SELECT id FROM complaint_assignments
+             WHERE complaint_id = ? AND staff_id = ? AND unassigned_at IS NULL
+             LIMIT 1`,
+            [complaintId, user.id]
+          );
+          hasActiveAssignment = assignCheck.length > 0;
+        }
+
+        if (!hasBlockAccess && !hasActiveAssignment) {
+          const err = new Error('Complaint not found.');
+          err.statusCode = 404;
+          throw err;
+        }
+      }
+
+      // 4. Disallow modifying closed complaints
+      if (complaint.status === 'closed') {
+        const err = new Error('Cannot update priority of a closed complaint.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // 5. Priority allowlist and normalization
+      const targetPriority = String(newPriority).toLowerCase().trim();
+      if (!['low', 'normal', 'high', 'urgent'].includes(targetPriority)) {
+        const err = new Error("Invalid priority level. Allowed values: 'low', 'normal', 'high', 'urgent'.");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      if (complaint.priority === targetPriority) {
+        const err = new Error(`Complaint priority is already set to '${targetPriority}'.`);
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // 6. Update priority in MySQL
+      await connection.query(
+        `UPDATE complaints
+         SET priority = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [targetPriority, complaintId]
+      );
+
+      // 7. Record priority change audit remark in complaint_status_history
+      const auditRemark = remarks && remarks.trim()
+        ? `Priority updated to '${targetPriority}': ${remarks.trim()}`
+        : `Priority updated from '${complaint.priority}' to '${targetPriority}'.`;
+
+      await connection.execute(
+        `INSERT INTO complaint_status_history (
+           complaint_id, changed_by, old_status, new_status, remarks, changed_at
+         ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [complaintId, user.id, complaint.status, complaint.status, auditRemark]
+      );
+
+      await connection.commit();
+
+      return {
+        id: complaintId,
+        ticket_number: complaint.ticket_number,
+        old_priority: complaint.priority,
+        priority: targetPriority,
+        status: complaint.status
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  /**
+   * Closes a resolved complaint (Student owner or Admin)
+   */
+  async closeComplaint({ complaintId, closingRemarks, user }) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [rows] = await connection.query(
+        `SELECT id, ticket_number, student_id, hostel_block, status
+         FROM complaints
+         WHERE id = ?
+         FOR UPDATE`,
+        [complaintId]
+      );
+
+      if (rows.length === 0) {
+        const err = new Error('Complaint not found.');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const complaint = rows[0];
+
+      if (user.role === 'student' && complaint.student_id !== user.id) {
+        const err = new Error('Complaint not found.');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      if (complaint.status !== 'resolved') {
+        const err = new Error(`Cannot close complaint. Ticket must be in 'resolved' status before closing (Current status: '${complaint.status}').`);
+        err.statusCode = 400;
+        throw err;
+      }
+
+      await connection.query(
+        `UPDATE complaints SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [complaintId]
+      );
+
+      const remarkText = closingRemarks && closingRemarks.trim()
+        ? closingRemarks.trim()
+        : 'Complaint closed after resident resolution confirmation.';
+
+      await connection.execute(
+        `INSERT INTO complaint_status_history (
+           complaint_id, changed_by, old_status, new_status, remarks, changed_at
+         ) VALUES (?, ?, 'resolved', 'closed', ?, CURRENT_TIMESTAMP)`,
+        [complaintId, user.id, remarkText]
+      );
+
+      await connection.commit();
+
+      return {
+        id: complaintId,
+        ticket_number: complaint.ticket_number,
+        status: 'closed',
+        previous_status: 'resolved'
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  /**
+   * Reopens a resolved complaint (Student owner, Staff, or Admin)
+   */
+  async reopenComplaint({ complaintId, reason, user }) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [rows] = await connection.query(
+        `SELECT id, ticket_number, student_id, hostel_block, status
+         FROM complaints
+         WHERE id = ?
+         FOR UPDATE`,
+        [complaintId]
+      );
+
+      if (rows.length === 0) {
+        const err = new Error('Complaint not found.');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const complaint = rows[0];
+
+      if (user.role === 'student' && complaint.student_id !== user.id) {
+        const err = new Error('Complaint not found.');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      if (user.role === 'staff') {
+        const hasBlockAccess = Boolean(
+          user.hostel_block &&
+          user.hostel_block.trim() &&
+          complaint.hostel_block &&
+          complaint.hostel_block.trim().toLowerCase() === user.hostel_block.trim().toLowerCase()
+        );
+
+        let hasActiveAssignment = false;
+        if (!hasBlockAccess) {
+          const [assignCheck] = await connection.query(
+            `SELECT id FROM complaint_assignments
+             WHERE complaint_id = ? AND staff_id = ? AND unassigned_at IS NULL
+             LIMIT 1`,
+            [complaintId, user.id]
+          );
+          hasActiveAssignment = assignCheck.length > 0;
+        }
+
+        if (!hasBlockAccess && !hasActiveAssignment) {
+          const err = new Error('Complaint not found.');
+          err.statusCode = 404;
+          throw err;
+        }
+      }
+
+      if (complaint.status !== 'resolved' && complaint.status !== 'closed') {
+        const err = new Error(`Cannot reopen complaint. Ticket is currently in '${complaint.status}' status.`);
+        err.statusCode = 400;
+        throw err;
+      }
+
+      if (complaint.status === 'closed' && user.role !== 'admin') {
+        const err = new Error('Only an Administrator can reopen a closed complaint.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      if (!reason || !reason.trim()) {
+        const err = new Error('Reason is required when reopening a complaint.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      await connection.query(
+        `UPDATE complaints SET status = 'in_progress', resolved_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [complaintId]
+      );
+
+      const remarkText = `Reopened: ${reason.trim()}`;
+
+      await connection.execute(
+        `INSERT INTO complaint_status_history (
+           complaint_id, changed_by, old_status, new_status, remarks, changed_at
+         ) VALUES (?, ?, ?, 'in_progress', ?, CURRENT_TIMESTAMP)`,
+        [complaintId, user.id, complaint.status, remarkText]
+      );
+
+      await connection.commit();
+
+      return {
+        id: complaintId,
+        ticket_number: complaint.ticket_number,
+        status: 'in_progress',
+        previous_status: complaint.status
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  /**
+   * Retrieves full chronological status history for a complaint
+   * @param {number} complaintId
+   * @returns {Promise<Array<object>>}
+   */
+  async getComplaintStatusHistory(complaintId) {
+    const [rows] = await pool.query(
+      `SELECT h.id, h.complaint_id, h.changed_by,
+              u.name AS changed_by_name, u.role AS changed_by_role, u.staff_designation,
+              h.old_status, h.new_status, h.remarks, h.changed_at
+       FROM complaint_status_history h
+       LEFT JOIN users u ON h.changed_by = u.id
+       WHERE h.complaint_id = ?
+       ORDER BY h.changed_at ASC, h.id ASC`,
+      [complaintId]
+    );
+
+    return rows;
   }
 };
 

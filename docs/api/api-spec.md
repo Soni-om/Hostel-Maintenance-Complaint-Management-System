@@ -251,31 +251,90 @@ Base URL: `http://localhost:5000/api/v1`
 
 ### 3.5 Update Complaint Status
 - **Method:** `PATCH`
-- **Endpoint:** `/complaints/:id/status`
-- **Access:** `Staff`, `Admin`
-- **Body:** `{ status, remarks }` (remarks required when status is `Resolved`)
-- **Success:** `200 OK` $\rightarrow$ `{ success: true, message, status }`
+- **Endpoint:** `/complaints/:id/status` (also `/api/staff/complaints/:id/status` and `/api/v1/complaints/:id/status`)
+- **Access:** `Staff`, `Admin` (Students forbidden with HTTP 403 `FORBIDDEN_ROLE` unless closing or reopening via dedicated endpoints)
+- **Body:**
+  ```json
+  {
+    "status": "resolved",
+    "remarks": "Replaced burnt fan speed regulator and verified rotation on all 5 speeds."
+  }
+  ```
+- **Lifecycle Transition Rules:**
+  - `pending` $\rightarrow$ `assigned`, `in_progress`
+  - `assigned` $\rightarrow$ `in_progress`, `pending`
+  - `in_progress` $\rightarrow$ `resolved` (remarks strictly required $\ge 5$ chars), `assigned`
+  - `resolved` $\rightarrow$ `closed`, `in_progress` (reopen reason required $\ge 5$ chars)
+  - `closed` $\rightarrow$ `in_progress` (Admin only)
+  - Invalid transitions return `400 Bad Request`.
+- **Atomic Operations:**
+  - Row lock with `FOR UPDATE`.
+  - When moving to `resolved`: sets `resolved_at = CURRENT_TIMESTAMP`.
+  - When moving from `resolved` to `in_progress`: sets `resolved_at = NULL`.
+  - Automatically records audit entry in `complaint_status_history` with changer user ID and remarks.
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, message, complaint }`
+- **Errors:**
+  - `400 Bad Request`: Invalid transition, missing resolution remarks, or terminal closed state.
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `403 Forbidden`: Authenticated user is a student (`FORBIDDEN_ROLE`).
+  - `404 Not Found`: Complaint not found or Option D anti-enumeration block.
 
 ### 3.6 Update Complaint Priority
 - **Method:** `PATCH`
-- **Endpoint:** `/complaints/:id/priority`
-- **Access:** `Staff`, `Admin`
-- **Body:** `{ priority }`
-- **Success:** `200 OK` $\rightarrow$ `{ success: true, message, priority }`
+- **Endpoint:** `/complaints/:id/priority` (also `/api/staff/complaints/:id/priority` and `/api/v1/complaints/:id/priority`)
+- **Access:** `Staff`, `Admin` (Students forbidden with HTTP 403 `FORBIDDEN_ROLE`)
+- **Body:**
+  ```json
+  {
+    "priority": "urgent",
+    "remarks": "Water leakage risking electrical short-circuit."
+  }
+  ```
+- **Allowed Priority Values:** `low`, `normal`, `high`, `urgent`.
+- **Constraints:**
+  - Cannot update priority of a closed complaint (returns `400 Bad Request`).
+  - Re-setting to same priority returns `400 Bad Request`.
+  - Option D hybrid visibility applies to staff.
+  - Logs priority change remark in `complaint_status_history`.
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, message, complaint }`
+- **Errors:**
+  - `400 Bad Request`: Invalid priority value or closed complaint.
+  - `401 Unauthorized`: Missing or invalid Bearer JWT (`NO_TOKEN`).
+  - `403 Forbidden`: Insufficient role permissions (`FORBIDDEN_ROLE`).
+  - `404 Not Found`: Complaint not found or Option D anti-enumeration.
 
 ### 3.7 Close Complaint
 - **Method:** `PATCH`
-- **Endpoint:** `/complaints/:id/close`
-- **Access:** `Student` (owner), `Admin`
-- **Body:** `{ closing_remarks }`
-- **Success:** `200 OK` $\rightarrow$ `{ success: true, message }`
+- **Endpoint:** `/complaints/:id/close` (also `/api/v1/complaints/:id/close`)
+- **Access:** `Student` (owner only), `Admin`
+- **Body:** `{ closing_remarks }` (optional)
+- **Constraint:** Complaint must be in `resolved` status before closing. Attempting to close non-resolved tickets returns `400 Bad Request`.
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, message: 'Complaint closed successfully.', complaint }`
+- **Errors:**
+  - `400 Bad Request`: Complaint is not in `resolved` status.
+  - `401 Unauthorized`: Missing or invalid Bearer JWT.
+  - `404 Not Found`: Complaint not found or student does not own ticket.
 
 ### 3.8 Reopen Complaint
 - **Method:** `PATCH`
-- **Endpoint:** `/complaints/:id/reopen`
-- **Access:** `Student` (owner), `Admin`
-- **Body:** `{ reason }`
-- **Success:** `200 OK` $\rightarrow$ `{ success: true, message }`
+- **Endpoint:** `/complaints/:id/reopen` (also `/api/v1/complaints/:id/reopen`)
+- **Access:** `Student` (owner), `Staff` (Option D), `Admin`
+- **Body:** `{ reason }` (required, min 5 chars)
+- **Constraint:** Complaint must be in `resolved` status (or `closed` for Admin). Reopens ticket to `in_progress` and resets `resolved_at = NULL`.
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, message: 'Complaint reopened successfully.', complaint }`
+- **Errors:**
+  - `400 Bad Request`: Missing reason or complaint not eligible for reopening.
+  - `401 Unauthorized`: Missing or invalid Bearer JWT.
+  - `404 Not Found`: Complaint not found or unauthorized under Option D/ownership.
+
+### 3.9 Get Complaint Status History
+- **Method:** `GET`
+- **Endpoint:** `/complaints/:id/history` (also `/api/staff/complaints/:id/history` and `/api/v1/complaints/:id/history`)
+- **Access:** Authenticated (Student owner, Option D Staff, Admin)
+- **Success:** `200 OK` $\rightarrow$ `{ success: true, complaint_id, ticket_number, history: [...] }`
+- **Errors:**
+  - `401 Unauthorized`: Missing or invalid Bearer JWT.
+  - `404 Not Found`: Complaint not found or unauthorized under Option D/ownership.
 
 ---
 

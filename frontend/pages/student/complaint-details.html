@@ -263,6 +263,24 @@
             </div>
           </div>
 
+          <!-- Resolution Actions Card (Shown when status is 'resolved') -->
+          <div id="student-actions-card" class="card" style="display: none; border-color: var(--color-success); background: rgba(22, 163, 74, 0.03);">
+            <h4 style="font-size: var(--font-sm); margin-bottom: 0.5rem; color: var(--color-success); font-weight: 700;">
+              ✓ Resolution Confirmation
+            </h4>
+            <p class="text-xs text-muted" style="line-height: 1.5; margin-bottom: 1rem;">
+              Hostel maintenance staff has resolved this ticket. Please inspect the work in your room and confirm resolution or request reopening if the issue persists.
+            </p>
+            <div class="flex flex-col gap-2">
+              <button id="btn-student-close" class="btn btn-primary btn-sm" onclick="confirmCloseComplaint()" style="background-color: var(--color-success); border-color: var(--color-success); width: 100%;">
+                ✓ Confirm & Close Ticket
+              </button>
+              <button id="btn-student-reopen" class="btn btn-secondary btn-sm" onclick="promptReopenComplaint()" style="width: 100%;">
+                ↩️ Reopen (Work Incomplete)
+              </button>
+            </div>
+          </div>
+
           <!-- Need Help / Student Guidance Card -->
           <div class="card" style="background: #f8fafc; border: 1px solid var(--color-border);">
             <h4 style="font-size: var(--font-sm); margin-bottom: 0.5rem; color: var(--color-text-main);">Need Urgent Help?</h4>
@@ -396,11 +414,67 @@
       document.getElementById('meta-updated-at').textContent = complaint.updated_at ? window.Utils.formatDate(complaint.updated_at) : '-';
       document.getElementById('meta-resolved-at').textContent = complaint.resolved_at ? window.Utils.formatDate(complaint.resolved_at) : 'Pending Resolution';
 
+      // Student Resolution Actions
+      const actionsCard = document.getElementById('student-actions-card');
+      if (actionsCard) {
+        actionsCard.style.display = (complaint.status === 'resolved') ? 'block' : 'none';
+      }
+
       // Attachment handling
       renderAttachment(complaint);
     }
 
-    // 7. Secure Attachment Streaming & Object URL rendering
+    // 7. Student Close & Reopen Actions
+    async function confirmCloseComplaint() {
+      if (!confirm('Are you satisfied with the maintenance resolution and ready to close this ticket?')) {
+        return;
+      }
+
+      const btn = document.getElementById('btn-student-close');
+      btn.disabled = true;
+      btn.textContent = 'Closing...';
+
+      try {
+        const res = await window.Api.patch(`/complaints/${currentComplaintId}/close`, {
+          closing_remarks: 'Resident verified and confirmed resolution.'
+        });
+        window.Utils.showToast(res.message || 'Ticket closed successfully!', 'success');
+        loadComplaintDetails();
+      } catch (err) {
+        console.error('Failed to close complaint:', err);
+        window.Utils.showToast(err.message || 'Failed to close ticket.', 'danger');
+        btn.disabled = false;
+        btn.textContent = '✓ Confirm & Close Ticket';
+      }
+    }
+
+    async function promptReopenComplaint() {
+      const reason = prompt('Please explain why the repair work is incomplete or why this ticket is being reopened:');
+      if (reason === null) return; // User cancelled
+      if (!reason.trim()) {
+        window.Utils.showToast('A reason is required when reopening a complaint.', 'warning');
+        return;
+      }
+
+      const btn = document.getElementById('btn-student-reopen');
+      btn.disabled = true;
+      btn.textContent = 'Reopening...';
+
+      try {
+        const res = await window.Api.patch(`/complaints/${currentComplaintId}/reopen`, {
+          reason: reason.trim()
+        });
+        window.Utils.showToast(res.message || 'Ticket reopened successfully!', 'success');
+        loadComplaintDetails();
+      } catch (err) {
+        console.error('Failed to reopen complaint:', err);
+        window.Utils.showToast(err.message || 'Failed to reopen ticket.', 'danger');
+        btn.disabled = false;
+        btn.textContent = '↩️ Reopen (Work Incomplete)';
+      }
+    }
+
+    // 8. Secure Attachment Streaming & Object URL rendering
     async function renderAttachment(complaint) {
       const noAttState = document.getElementById('no-attachment-state');
       const attContent = document.getElementById('attachment-content');

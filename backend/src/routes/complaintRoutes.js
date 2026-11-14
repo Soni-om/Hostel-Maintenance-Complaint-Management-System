@@ -10,7 +10,11 @@ import {
   validateComplaintCreationRules,
   validateComplaintListRules,
   validateComplaintIdRules,
-  validateComplaintAssignmentRules
+  validateComplaintAssignmentRules,
+  validateComplaintStatusUpdateRules,
+  validateComplaintPriorityUpdateRules,
+  validateComplaintCloseRules,
+  validateComplaintReopenRules
 } from '../middleware/validationMiddleware.js';
 import ComplaintController from '../controllers/complaintController.js';
 import StaffController from '../controllers/staffController.js';
@@ -112,6 +116,63 @@ router.get(
   requireRole('staff', 'admin'),
   validateComplaintIdRules,
   StaffController.getAssignments
+);
+
+/**
+ * @route   PATCH /api/complaints/:id/status or /api/v1/complaints/:id/status
+ * @desc    Update complaint status through lifecycle transition engine
+ * @access  Staff and Admin (Student owner for close/reopen)
+ */
+router.patch(
+  '/:id/status',
+  validateComplaintStatusUpdateRules,
+  ComplaintController.updateStatus
+);
+
+/**
+ * @route   PATCH /api/complaints/:id/priority or /api/v1/complaints/:id/priority
+ * @desc    Update complaint priority level
+ * @access  Staff and Admin only
+ */
+router.patch(
+  '/:id/priority',
+  requireRole('staff', 'admin'),
+  validateComplaintPriorityUpdateRules,
+  ComplaintController.updatePriority
+);
+
+/**
+ * @route   PATCH /api/complaints/:id/close or /api/v1/complaints/:id/close
+ * @desc    Close a resolved complaint
+ * @access  Student owner and Admin
+ */
+router.patch(
+  '/:id/close',
+  requireRole('student', 'admin'),
+  validateComplaintCloseRules,
+  ComplaintController.closeComplaint
+);
+
+/**
+ * @route   PATCH /api/complaints/:id/reopen or /api/v1/complaints/:id/reopen
+ * @desc    Reopen a resolved or closed complaint
+ * @access  Student owner, Staff, and Admin
+ */
+router.patch(
+  '/:id/reopen',
+  validateComplaintReopenRules,
+  ComplaintController.reopenComplaint
+);
+
+/**
+ * @route   GET /api/complaints/:id/history or /api/v1/complaints/:id/history
+ * @desc    Retrieve full chronological status history for a complaint
+ * @access  Authenticated (Student owner, Option D Staff, Admin)
+ */
+router.get(
+  '/:id/history',
+  validateComplaintIdRules,
+  ComplaintController.getStatusHistory
 );
 
 export default router;

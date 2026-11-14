@@ -262,6 +262,215 @@ const ComplaintController = {
         message: 'An unexpected internal error occurred while retrieving attachment.'
       });
     }
+  },
+
+  /**
+   * Updates complaint status through verified lifecycle transition rules
+   * PATCH /api/complaints/:id/status or /api/v1/complaints/:id/status
+   * Access: Staff and Admin (Student owner for close/reopen)
+   */
+  async updateStatus(req, res, next) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+      const { status, remarks } = req.body;
+
+      const result = await ComplaintModel.updateStatus({
+        complaintId,
+        newStatus: status,
+        remarks,
+        user: req.user
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: `Complaint status updated to '${result.status}'.`,
+        complaint: result
+      });
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message
+        });
+      }
+      console.error('Update Complaint Status Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while updating complaint status.'
+      });
+    }
+  },
+
+  /**
+   * Updates complaint priority level
+   * PATCH /api/complaints/:id/priority or /api/v1/complaints/:id/priority
+   * Access: Staff and Admin only
+   */
+  async updatePriority(req, res, next) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+      const { priority, remarks } = req.body;
+
+      const result = await ComplaintModel.updatePriority({
+        complaintId,
+        newPriority: priority,
+        remarks,
+        user: req.user
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: `Complaint priority updated to '${result.priority}'.`,
+        complaint: result
+      });
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message
+        });
+      }
+      console.error('Update Complaint Priority Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while updating complaint priority.'
+      });
+    }
+  },
+
+  /**
+   * Closes a resolved complaint
+   * PATCH /api/complaints/:id/close or /api/v1/complaints/:id/close
+   * Access: Student owner and Admin
+   */
+  async closeComplaint(req, res, next) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+      const closingRemarks = req.body.closing_remarks || req.body.remarks;
+
+      const result = await ComplaintModel.closeComplaint({
+        complaintId,
+        closingRemarks,
+        user: req.user
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Complaint closed successfully.',
+        complaint: result
+      });
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message
+        });
+      }
+      console.error('Close Complaint Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while closing the complaint.'
+      });
+    }
+  },
+
+  /**
+   * Reopens a resolved or closed complaint
+   * PATCH /api/complaints/:id/reopen or /api/v1/complaints/:id/reopen
+   * Access: Student owner, Staff (Option D), and Admin
+   */
+  async reopenComplaint(req, res, next) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+      const reason = req.body.reason || req.body.remarks;
+
+      const result = await ComplaintModel.reopenComplaint({
+        complaintId,
+        reason,
+        user: req.user
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Complaint reopened successfully.',
+        complaint: result
+      });
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message
+        });
+      }
+      console.error('Reopen Complaint Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while reopening the complaint.'
+      });
+    }
+  },
+
+  /**
+   * Retrieves full chronological status history for a complaint
+   * GET /api/complaints/:id/history or /api/v1/complaints/:id/history
+   * Access: Student owner, Staff (Option D), Admin
+   */
+  async getStatusHistory(req, res, next) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+
+      const complaint = await ComplaintModel.findById(complaintId);
+      if (!complaint) {
+        return res.status(404).json({
+          success: false,
+          message: 'Complaint not found.'
+        });
+      }
+
+      // Authorization guard: Student must own; Staff must have block access or active assignment
+      if (req.user.role === 'student') {
+        if (complaint.student_id !== req.user.id) {
+          return res.status(404).json({
+            success: false,
+            message: 'Complaint not found.'
+          });
+        }
+      } else if (req.user.role === 'staff') {
+        const hasBlockAccess = Boolean(
+          req.user.hostel_block &&
+          req.user.hostel_block.trim() &&
+          complaint.hostel_block &&
+          complaint.hostel_block.trim().toLowerCase() === req.user.hostel_block.trim().toLowerCase()
+        );
+
+        let hasActiveAssignment = false;
+        if (!hasBlockAccess) {
+          hasActiveAssignment = await ComplaintModel.isComplaintAssignedToStaff(complaintId, req.user.id);
+        }
+
+        if (!hasBlockAccess && !hasActiveAssignment) {
+          return res.status(404).json({
+            success: false,
+            message: 'Complaint not found.'
+          });
+        }
+      }
+
+      const history = await ComplaintModel.getComplaintStatusHistory(complaintId);
+
+      return res.status(200).json({
+        success: true,
+        complaint_id: complaintId,
+        ticket_number: complaint.ticket_number,
+        history
+      });
+    } catch (error) {
+      console.error('Get Status History Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while retrieving status history.'
+      });
+    }
   }
 };
 

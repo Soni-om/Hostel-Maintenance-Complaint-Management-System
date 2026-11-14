@@ -406,6 +406,106 @@
     </div>
   </div>
 
+  <!-- Complaint Details, Status Transition & Priority Modal -->
+  <div id="details-modal" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width: 680px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="details-ticket-title">Maintenance Ticket</h3>
+          <p class="text-xs text-muted" id="details-ticket-subtitle" style="margin: 0;">Lifecycle progression, priority adjustments & status audit</p>
+        </div>
+        <button style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--color-text-muted); line-height: 1;" onclick="closeDetailsModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <!-- Error Alert -->
+        <div id="details-error-alert" class="alert alert-danger" style="display: none; margin-bottom: 1rem;">
+          <span id="details-error-msg"></span>
+        </div>
+
+        <!-- Ticket Summary Card -->
+        <div style="background: var(--color-bg-muted); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.25rem; border: 1px solid var(--color-border);">
+          <div class="flex justify-between items-center" style="margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div class="flex items-center gap-2">
+              <span id="details-status-badge"></span>
+              <span id="details-priority-badge"></span>
+            </div>
+            <span id="details-date" class="text-xs text-muted"></span>
+          </div>
+          <h4 id="details-title" style="margin: 0 0 0.35rem; font-size: var(--font-base); font-weight: 600; color: var(--color-text-main);"></h4>
+          <p id="details-description" style="font-size: var(--font-sm); color: var(--color-text-muted); margin: 0 0 0.75rem; white-space: pre-wrap;"></p>
+          <div class="grid grid-cols-2" style="gap: 0.5rem; font-size: var(--font-xs); border-top: 1px solid var(--color-border); padding-top: 0.5rem;">
+            <div><strong>Resident:</strong> <span id="details-resident"></span></div>
+            <div><strong>Location:</strong> <span id="details-location"></span></div>
+            <div><strong>Assignee:</strong> <span id="details-assignee"></span></div>
+            <div id="details-photo-box"><strong>Photo:</strong> <span id="details-photo-link">None</span></div>
+          </div>
+        </div>
+
+        <!-- Interactive Actions Grid: Status Transition & Priority -->
+        <div class="grid grid-cols-2" style="gap: 1rem; margin-bottom: 1.5rem;">
+          <!-- Status Transition Box -->
+          <div style="border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.85rem; background: var(--color-bg-surface);">
+            <h5 style="margin: 0 0 0.5rem; font-size: var(--font-xs); font-weight: 700; text-transform: uppercase; color: var(--color-text-muted);">
+              🔄 Status Transition
+            </h5>
+            <form id="status-transition-form" onsubmit="event.preventDefault(); submitStatusTransition();">
+              <input type="hidden" id="details-complaint-id">
+              <div class="form-group" style="margin-bottom: 0.6rem;">
+                <label for="details-next-status" class="form-label" style="font-size: 11px;">Next Status *</label>
+                <select id="details-next-status" class="form-select" style="font-size: var(--font-xs); padding: 0.35rem 0.5rem;" required>
+                  <option value="">-- Choose Status --</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0.75rem;">
+                <label for="details-status-remarks" class="form-label" style="font-size: 11px;">Work Remarks / Justification</label>
+                <textarea id="details-status-remarks" class="form-textarea" rows="2" style="font-size: var(--font-xs);" placeholder="Required when resolving or reopening..."></textarea>
+              </div>
+              <button type="submit" id="btn-submit-status" class="btn btn-primary btn-sm" style="width: 100%; font-size: var(--font-xs);">
+                Apply Status
+              </button>
+            </form>
+          </div>
+
+          <!-- Priority Update Box -->
+          <div style="border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.85rem; background: var(--color-bg-surface);">
+            <h5 style="margin: 0 0 0.5rem; font-size: var(--font-xs); font-weight: 700; text-transform: uppercase; color: var(--color-text-muted);">
+              ⚡ Priority Level
+            </h5>
+            <form id="priority-update-form" onsubmit="event.preventDefault(); submitPriorityUpdate();">
+              <div class="form-group" style="margin-bottom: 0.6rem;">
+                <label for="details-priority-select" class="form-label" style="font-size: 11px;">Select Priority *</label>
+                <select id="details-priority-select" class="form-select" style="font-size: var(--font-xs); padding: 0.35rem 0.5rem;" required>
+                  <option value="low">Low (General maintenance)</option>
+                  <option value="normal">Normal (Standard priority)</option>
+                  <option value="high">High (Elevated attention)</option>
+                  <option value="urgent">Urgent (Immediate safety / outage)</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0.75rem;">
+                <label for="details-priority-remarks" class="form-label" style="font-size: 11px;">Reason (Optional)</label>
+                <textarea id="details-priority-remarks" class="form-textarea" rows="2" style="font-size: var(--font-xs);" placeholder="e.g. Water leak damaging plaster..."></textarea>
+              </div>
+              <button type="submit" id="btn-submit-priority" class="btn btn-secondary btn-sm" style="width: 100%; font-size: var(--font-xs);">
+                Update Priority
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Full Status History Timeline Section -->
+        <div style="border-top: 1px solid var(--color-border); padding-top: 1.25rem;">
+          <h4 style="font-size: var(--font-sm); font-weight: 700; margin-bottom: 0.75rem; color: var(--color-text-main); display: flex; align-items: center; justify-content: space-between;">
+            <span>📜 Status Lifecycle & Audit Timeline</span>
+            <span id="details-history-count" class="text-xs text-muted" style="font-weight: normal;">0 records</span>
+          </h4>
+          <div id="status-history-list">
+            <div class="text-center text-muted text-xs" style="padding: 1rem;">Loading status history...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="/js/config.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/utils.js"></script>
@@ -685,10 +785,253 @@
     }
 
     function viewComplaintDetails(complaintId) {
-      window.Utils.showToast(`Complaint #${complaintId} selected. Status transition workflows will be enabled in Session 15.`, 'info');
+      openDetailsModal(complaintId);
     }
 
-    // 8. Technician Directory & Assignment Modal Workflows
+    // 8. Details, Lifecycle Status Transitions & Priority Workflows
+    const STATUS_TRANSITIONS_MAP = {
+      pending: [
+        { value: 'assigned', label: 'Assigned (Technician Delegated)' },
+        { value: 'in_progress', label: 'In Progress (Direct Repair Begun)' }
+      ],
+      assigned: [
+        { value: 'in_progress', label: 'In Progress (Start Repair Work)' },
+        { value: 'pending', label: 'Pending (Reset to Unassigned)' }
+      ],
+      in_progress: [
+        { value: 'resolved', label: 'Resolved (Repairs Finished — Remarks Required)' },
+        { value: 'assigned', label: 'Assigned (Put Work on Hold / Transfer)' }
+      ],
+      resolved: [
+        { value: 'closed', label: 'Closed (Verification Completed)' },
+        { value: 'in_progress', label: 'In Progress (Reopen Issue — Reason Required)' }
+      ],
+      closed: [
+        { value: 'in_progress', label: 'In Progress (Reopen Ticket — Admin Only)' }
+      ]
+    };
+
+    async function openDetailsModal(complaintId) {
+      const modal = document.getElementById('details-modal');
+      const errorAlert = document.getElementById('details-error-alert');
+      const submitStatusBtn = document.getElementById('btn-submit-status');
+      const submitPriorityBtn = document.getElementById('btn-submit-priority');
+
+      errorAlert.style.display = 'none';
+      submitStatusBtn.disabled = false;
+      submitStatusBtn.textContent = 'Apply Status';
+      submitPriorityBtn.disabled = false;
+      submitPriorityBtn.textContent = 'Update Priority';
+
+      document.getElementById('details-complaint-id').value = complaintId;
+      document.getElementById('details-status-remarks').value = '';
+      document.getElementById('details-priority-remarks').value = '';
+
+      const complaint = complaintsListCache.find(c => c.id === complaintId);
+      if (complaint) {
+        document.getElementById('details-ticket-title').textContent = `Maintenance Ticket ${complaint.ticket_number || '#' + complaint.id}`;
+        document.getElementById('details-ticket-subtitle').textContent = `${complaint.category_name || 'General'} • Block ${complaint.hostel_block || '-'}, Room ${complaint.room_number || '-'}`;
+        document.getElementById('details-status-badge').innerHTML = window.Utils.renderStatusBadge(complaint.status || 'pending');
+        document.getElementById('details-priority-badge').innerHTML = window.Utils.renderPriorityBadge(complaint.priority || 'normal');
+        document.getElementById('details-date').textContent = complaint.created_at ? window.Utils.formatDate(complaint.created_at) : '—';
+        document.getElementById('details-title').textContent = complaint.title || 'Untitled';
+        document.getElementById('details-description').textContent = complaint.description || 'No description provided.';
+        document.getElementById('details-resident').textContent = complaint.student_name || 'Resident';
+        document.getElementById('details-location').textContent = `Block ${complaint.hostel_block || '-'}, Rm ${complaint.room_number || '-'}`;
+        document.getElementById('details-assignee').textContent = complaint.assigned_staff_name
+          ? `${complaint.assigned_staff_name} (${complaint.assigned_staff_designation || 'Staff'})`
+          : 'Currently Unassigned';
+
+        const photoLinkEl = document.getElementById('details-photo-link');
+        if (complaint.has_attachment && complaint.attachment_download_url) {
+          photoLinkEl.innerHTML = `<a href="${complaint.attachment_download_url}" target="_blank" class="badge-has-photo">📎 View Attached Photo</a>`;
+        } else {
+          photoLinkEl.textContent = 'None';
+        }
+
+        // Populate valid next transitions
+        const nextStatusSelect = document.getElementById('details-next-status');
+        const allowed = STATUS_TRANSITIONS_MAP[complaint.status] || [];
+        nextStatusSelect.innerHTML = '<option value="">-- Choose Next Status --</option>';
+
+        if (allowed.length === 0) {
+          nextStatusSelect.innerHTML = '<option value="">No transitions available</option>';
+          nextStatusSelect.disabled = true;
+          submitStatusBtn.disabled = true;
+        } else {
+          nextStatusSelect.disabled = false;
+          allowed.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.value;
+            opt.textContent = t.label;
+            nextStatusSelect.appendChild(opt);
+          });
+        }
+
+        // Set priority select
+        const prioritySelect = document.getElementById('details-priority-select');
+        prioritySelect.value = complaint.priority || 'normal';
+        if (complaint.status === 'closed') {
+          prioritySelect.disabled = true;
+          submitPriorityBtn.disabled = true;
+        } else {
+          prioritySelect.disabled = false;
+        }
+      }
+
+      loadStatusHistory(complaintId);
+      modal.classList.add('active');
+    }
+
+    function closeDetailsModal() {
+      const modal = document.getElementById('details-modal');
+      modal.classList.remove('active');
+      document.getElementById('details-error-alert').style.display = 'none';
+      document.getElementById('status-transition-form').reset();
+      document.getElementById('priority-update-form').reset();
+    }
+
+    async function loadStatusHistory(complaintId) {
+      const container = document.getElementById('status-history-list');
+      const countBadge = document.getElementById('details-history-count');
+      container.innerHTML = '<div class="text-center text-muted text-xs" style="padding: 1rem;">Loading status history...</div>';
+
+      try {
+        const res = await window.Api.get(`/staff/complaints/${complaintId}/history`);
+        const history = res.history || [];
+        countBadge.textContent = `${history.length} ${history.length === 1 ? 'record' : 'records'}`;
+
+        if (history.length === 0) {
+          container.innerHTML = '<div class="text-muted text-xs" style="padding: 0.75rem; text-align: center; background: var(--color-bg-muted); border-radius: var(--radius-sm);">No history recorded yet.</div>';
+          return;
+        }
+
+        container.innerHTML = '';
+        history.forEach((item) => {
+          const row = document.createElement('div');
+          row.style.cssText = `
+            padding: 0.65rem 0.85rem;
+            border-left: 3px solid var(--color-primary);
+            background: var(--color-bg-muted);
+            margin-bottom: 0.5rem;
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            font-size: var(--font-xs);
+          `;
+
+          const changerSafe = window.Utils.escapeHtml(item.changed_by_name || 'System');
+          const roleSafe = window.Utils.escapeHtml(item.changed_by_role || 'staff');
+          const desigSafe = item.staff_designation ? ` (${window.Utils.escapeHtml(item.staff_designation)})` : '';
+          const changedAtSafe = item.changed_at ? window.Utils.formatDate(item.changed_at) : '—';
+          const remarksSafe = item.remarks ? window.Utils.escapeHtml(item.remarks) : null;
+
+          const oldStatusBadge = item.old_status ? window.Utils.renderStatusBadge(item.old_status) : '<span class="badge" style="background:#e2e8f0;color:#475569;">Initial</span>';
+          const newStatusBadge = window.Utils.renderStatusBadge(item.new_status);
+
+          row.innerHTML = `
+            <div class="flex justify-between items-center" style="margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.35rem;">
+              <div class="flex items-center gap-1">
+                ${oldStatusBadge} <span class="text-muted">➔</span> ${newStatusBadge}
+              </div>
+              <span class="text-muted" style="font-size: 11px;">${changedAtSafe}</span>
+            </div>
+            <div class="text-muted" style="font-size: 11px;">
+              Updated by <strong>${changerSafe}</strong> <span style="text-transform: capitalize;">[${roleSafe}${desigSafe}]</span>
+            </div>
+            ${remarksSafe ? `<div style="margin-top: 0.35rem; font-style: italic; color: var(--color-text-main); background: rgba(0,0,0,0.03); padding: 0.35rem 0.6rem; border-radius: var(--radius-sm);">"${remarksSafe}"</div>` : ''}
+          `;
+          container.appendChild(row);
+        });
+      } catch (err) {
+        console.error('Failed to load status history:', err);
+        container.innerHTML = `<div class="text-danger text-xs" style="padding: 0.5rem;">Failed to load status history: ${window.Utils.escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    async function submitStatusTransition() {
+      const complaintId = parseInt(document.getElementById('details-complaint-id').value, 10);
+      const nextStatus = document.getElementById('details-next-status').value;
+      const remarks = document.getElementById('details-status-remarks').value.trim();
+      const errorAlert = document.getElementById('details-error-alert');
+      const errorMsg = document.getElementById('details-error-msg');
+      const submitBtn = document.getElementById('btn-submit-status');
+
+      errorAlert.style.display = 'none';
+
+      if (!nextStatus) {
+        errorAlert.style.display = 'flex';
+        errorMsg.textContent = 'Please choose a target status.';
+        return;
+      }
+
+      if (nextStatus === 'resolved' && !remarks) {
+        errorAlert.style.display = 'flex';
+        errorMsg.textContent = 'Resolution remarks are required when marking a complaint as resolved.';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Applying...';
+
+      try {
+        const payload = {
+          status: nextStatus,
+          remarks: remarks || undefined
+        };
+
+        const res = await window.Api.patch(`/staff/complaints/${complaintId}/status`, payload);
+        window.Utils.showToast(res.message || 'Status updated successfully!', 'success');
+
+        // Refresh complaints list and stats
+        await loadComplaints();
+
+        // Refresh details modal view
+        openDetailsModal(complaintId);
+      } catch (err) {
+        console.error('Failed to update status:', err);
+        errorAlert.style.display = 'flex';
+        errorMsg.textContent = err.message || 'Failed to update complaint status.';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Apply Status';
+      }
+    }
+
+    async function submitPriorityUpdate() {
+      const complaintId = parseInt(document.getElementById('details-complaint-id').value, 10);
+      const priority = document.getElementById('details-priority-select').value;
+      const remarks = document.getElementById('details-priority-remarks').value.trim();
+      const errorAlert = document.getElementById('details-error-alert');
+      const errorMsg = document.getElementById('details-error-msg');
+      const submitBtn = document.getElementById('btn-submit-priority');
+
+      errorAlert.style.display = 'none';
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Updating...';
+
+      try {
+        const payload = {
+          priority,
+          remarks: remarks || undefined
+        };
+
+        const res = await window.Api.patch(`/staff/complaints/${complaintId}/priority`, payload);
+        window.Utils.showToast(res.message || 'Priority updated successfully!', 'success');
+
+        // Refresh complaints list
+        await loadComplaints();
+
+        // Refresh details modal view
+        openDetailsModal(complaintId);
+      } catch (err) {
+        console.error('Failed to update priority:', err);
+        errorAlert.style.display = 'flex';
+        errorMsg.textContent = err.message || 'Failed to update complaint priority.';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Update Priority';
+      }
+    }
+
+    // 9. Technician Directory & Assignment Modal Workflows
     async function loadTechnicians() {
       const select = document.getElementById('assign-staff-select');
       try {
@@ -880,12 +1223,22 @@
       }
     });
 
+    document.getElementById('details-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'details-modal') {
+        closeDetailsModal();
+      }
+    });
+
     // Escape key to close modal
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        const modal = document.getElementById('assign-modal');
-        if (modal && modal.classList.contains('active')) {
+        const assignModal = document.getElementById('assign-modal');
+        if (assignModal && assignModal.classList.contains('active')) {
           closeAssignModal();
+        }
+        const detailsModal = document.getElementById('details-modal');
+        if (detailsModal && detailsModal.classList.contains('active')) {
+          closeDetailsModal();
         }
       }
     });

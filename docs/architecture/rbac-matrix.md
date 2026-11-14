@@ -62,6 +62,11 @@
 | `GET` | `/api/v1/complaints` | Bearer JWT | All Roles | Student sees own tickets; Staff sees domain; Admin sees all. | `200`, `401`, `403` |
 | `GET` | `/api/v1/complaints/:id` | Bearer JWT | All Roles | Student owner only (403 if unowned); Staff/Admin authorized. | `200`, `401`, `403`, `404` |
 | `GET` | `/api/v1/complaints/:id/attachments/:attachmentId` | Bearer JWT | `student`, `staff`, `admin` | Student owner only (404 unowned); Admin authorized; Staff authorized under Option D (404 anti-enumeration for non-permitted cross-hostel attempts). | `200`, `400`, `401`, `403`, `404` |
+| `PATCH` | `/api/v1/complaints/:id/status` | Bearer JWT | `staff`, `admin` | Updates status through state machine (`pending` $\rightarrow$ `assigned`/`in_progress` $\rightarrow$ `resolved` $\rightarrow$ `closed`). Option D scope. Remarks required for `resolved`. Status history recorded. | `200`, `400`, `401`, `403`, `404` |
+| `PATCH` | `/api/v1/complaints/:id/priority` | Bearer JWT | `staff`, `admin` | Updates priority (`low`, `normal`, `high`, `urgent`). Option D scope. Closed complaints rejected with 400. Students forbidden (403). Status history recorded. | `200`, `400`, `401`, `403`, `404` |
+| `PATCH` | `/api/v1/complaints/:id/close` | Bearer JWT | `student`, `admin` | Closes resolved complaint. Student owner or Admin only. Non-resolved complaints rejected with 400. Status history recorded. | `200`, `400`, `401`, `403`, `404` |
+| `PATCH` | `/api/v1/complaints/:id/reopen` | Bearer JWT | `student`, `staff`, `admin` | Reopens resolved complaint to `in_progress`. Reason required. Resets `resolved_at = NULL`. Status history recorded. | `200`, `400`, `401`, `403`, `404` |
+| `GET` | `/api/v1/complaints/:id/history` | Bearer JWT | All Roles | Chronological status history audit trail. Student owner, Option D Staff, Admin. | `200`, `400`, `401`, `403`, `404` |
 
 ---
 

@@ -9,7 +9,9 @@ import StaffController from '../controllers/staffController.js';
 import {
   validateStaffComplaintQueryRules,
   validateComplaintAssignmentRules,
-  validateComplaintIdRules
+  validateComplaintIdRules,
+  validateComplaintStatusUpdateRules,
+  validateComplaintPriorityUpdateRules
 } from '../middleware/validationMiddleware.js';
 
 const router = Router();
@@ -77,6 +79,42 @@ router.get(
   requireRole('staff', 'admin'),
   validateComplaintIdRules,
   StaffController.getAssignments
+);
+
+/**
+ * @route   PATCH /api/staff/complaints/:id/status or /api/v1/staff/complaints/:id/status
+ * @desc    Update complaint status through lifecycle transition engine
+ * @access  Staff and Admin only
+ */
+router.patch(
+  '/complaints/:id/status',
+  requireRole('staff', 'admin'),
+  validateComplaintStatusUpdateRules,
+  StaffController.updateStatus
+);
+
+/**
+ * @route   PATCH /api/staff/complaints/:id/priority or /api/v1/staff/complaints/:id/priority
+ * @desc    Update complaint priority level
+ * @access  Staff and Admin only
+ */
+router.patch(
+  '/complaints/:id/priority',
+  requireRole('staff', 'admin'),
+  validateComplaintPriorityUpdateRules,
+  StaffController.updatePriority
+);
+
+/**
+ * @route   GET /api/staff/complaints/:id/history or /api/v1/staff/complaints/:id/history
+ * @desc    Retrieve full chronological status history for a complaint
+ * @access  Staff and Admin only
+ */
+router.get(
+  '/complaints/:id/history',
+  requireRole('staff', 'admin'),
+  validateComplaintIdRules,
+  StaffController.getStatusHistory
 );
 
 export default router;

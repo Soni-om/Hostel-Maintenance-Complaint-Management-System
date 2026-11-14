@@ -185,6 +185,135 @@ const StaffController = {
         message: 'An unexpected internal error occurred while retrieving active technicians.'
       });
     }
+  },
+
+  /**
+   * Updates complaint status from Staff Maintenance Desk
+   * PATCH /api/staff/complaints/:id/status or /api/v1/staff/complaints/:id/status
+   * Access: Staff and Admin only
+   */
+  async updateStatus(req, res, next) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+      const { status, remarks } = req.body;
+
+      const result = await ComplaintModel.updateStatus({
+        complaintId,
+        newStatus: status,
+        remarks,
+        user: req.user
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: `Complaint status updated to '${result.status}'.`,
+        complaint: result
+      });
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message
+        });
+      }
+      console.error('Staff updateStatus Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while updating complaint status.'
+      });
+    }
+  },
+
+  /**
+   * Updates complaint priority level from Staff Maintenance Desk
+   * PATCH /api/staff/complaints/:id/priority or /api/v1/staff/complaints/:id/priority
+   * Access: Staff and Admin only
+   */
+  async updatePriority(req, res, next) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+      const { priority, remarks } = req.body;
+
+      const result = await ComplaintModel.updatePriority({
+        complaintId,
+        newPriority: priority,
+        remarks,
+        user: req.user
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: `Complaint priority updated to '${result.priority}'.`,
+        complaint: result
+      });
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message
+        });
+      }
+      console.error('Staff updatePriority Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while updating complaint priority.'
+      });
+    }
+  },
+
+  /**
+   * Retrieves full chronological status history for a complaint
+   * GET /api/staff/complaints/:id/history or /api/v1/staff/complaints/:id/history
+   * Access: Staff and Admin only
+   */
+  async getStatusHistory(req, res, next) {
+    try {
+      const complaintId = parseInt(req.params.id, 10);
+
+      const complaint = await ComplaintModel.findById(complaintId);
+      if (!complaint) {
+        return res.status(404).json({
+          success: false,
+          message: 'Complaint not found.'
+        });
+      }
+
+      if (req.user.role === 'staff') {
+        const hasBlockAccess = Boolean(
+          req.user.hostel_block &&
+          req.user.hostel_block.trim() &&
+          complaint.hostel_block &&
+          complaint.hostel_block.trim().toLowerCase() === req.user.hostel_block.trim().toLowerCase()
+        );
+
+        let hasActiveAssignment = false;
+        if (!hasBlockAccess) {
+          hasActiveAssignment = await ComplaintModel.isComplaintAssignedToStaff(complaintId, req.user.id);
+        }
+
+        if (!hasBlockAccess && !hasActiveAssignment) {
+          return res.status(404).json({
+            success: false,
+            message: 'Complaint not found.'
+          });
+        }
+      }
+
+      const history = await ComplaintModel.getComplaintStatusHistory(complaintId);
+
+      return res.status(200).json({
+        success: true,
+        complaint_id: complaintId,
+        ticket_number: complaint.ticket_number,
+        history
+      });
+    } catch (error) {
+      console.error('Staff getStatusHistory Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An unexpected internal error occurred while retrieving status history.'
+      });
+    }
   }
 };
 

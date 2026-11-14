@@ -463,3 +463,127 @@ export const validateComplaintAssignmentRules = [
 
   handleValidationErrors
 ];
+
+/**
+ * Validation rules for Complaint Status Update (PATCH /api/complaints/:id/status)
+ */
+export const validateComplaintStatusUpdateRules = [
+  param('id')
+    .notEmpty().withMessage('Complaint ID is required.')
+    .isInt({ min: 1 }).withMessage('Complaint ID must be a valid positive integer.')
+    .toInt(),
+
+  body('status')
+    .notEmpty().withMessage('Status is required.')
+    .isString().withMessage('Status must be a string.')
+    .trim()
+    .toLowerCase()
+    .isIn(['pending', 'assigned', 'in_progress', 'resolved', 'closed'])
+    .withMessage("Invalid status. Allowed values: 'pending', 'assigned', 'in_progress', 'resolved', 'closed'."),
+
+  body('remarks')
+    .optional({ nullable: true })
+    .custom((val, { req }) => {
+      const targetStatus = req.body?.status ? String(req.body.status).toLowerCase().trim() : '';
+
+      // Compulsory resolution remarks when moving to 'resolved'
+      if (targetStatus === 'resolved') {
+        if (!val || typeof val !== 'string' || !val.trim()) {
+          throw new Error('Resolution remarks are required when marking a complaint as resolved.');
+        }
+        if (val.trim().length < 5) {
+          throw new Error('Resolution remarks must be at least 5 characters long.');
+        }
+      }
+
+      if (val !== undefined && val !== null && typeof val !== 'string') {
+        throw new Error('Remarks must be a string.');
+      }
+
+      if (val && typeof val === 'string' && val.trim().length > 1000) {
+        throw new Error('Remarks cannot exceed 1000 characters.');
+      }
+
+      return true;
+    }),
+
+  handleValidationErrors
+];
+
+/**
+ * Validation rules for Complaint Priority Update (PATCH /api/complaints/:id/priority)
+ */
+export const validateComplaintPriorityUpdateRules = [
+  param('id')
+    .notEmpty().withMessage('Complaint ID is required.')
+    .isInt({ min: 1 }).withMessage('Complaint ID must be a valid positive integer.')
+    .toInt(),
+
+  body('priority')
+    .notEmpty().withMessage('Priority is required.')
+    .isString().withMessage('Priority must be a string.')
+    .trim()
+    .toLowerCase()
+    .isIn(['low', 'normal', 'high', 'urgent'])
+    .withMessage("Invalid priority level. Allowed values: 'low', 'normal', 'high', 'urgent'."),
+
+  body('remarks')
+    .optional({ nullable: true, checkFalsy: true })
+    .isString().withMessage('Remarks must be a string.')
+    .trim()
+    .isLength({ max: 1000 }).withMessage('Remarks cannot exceed 1000 characters.'),
+
+  handleValidationErrors
+];
+
+/**
+ * Validation rules for Complaint Closure (PATCH /api/complaints/:id/close)
+ */
+export const validateComplaintCloseRules = [
+  param('id')
+    .notEmpty().withMessage('Complaint ID is required.')
+    .isInt({ min: 1 }).withMessage('Complaint ID must be a valid positive integer.')
+    .toInt(),
+
+  body('closing_remarks')
+    .optional({ nullable: true, checkFalsy: true })
+    .custom((val, { req }) => {
+      const remarks = val || req.body?.remarks;
+      if (remarks && typeof remarks !== 'string') {
+        throw new Error('Closing remarks must be a string.');
+      }
+      if (remarks && remarks.trim().length > 1000) {
+        throw new Error('Closing remarks cannot exceed 1000 characters.');
+      }
+      return true;
+    }),
+
+  handleValidationErrors
+];
+
+/**
+ * Validation rules for Complaint Reopen (PATCH /api/complaints/:id/reopen)
+ */
+export const validateComplaintReopenRules = [
+  param('id')
+    .notEmpty().withMessage('Complaint ID is required.')
+    .isInt({ min: 1 }).withMessage('Complaint ID must be a valid positive integer.')
+    .toInt(),
+
+  body('reason')
+    .custom((val, { req }) => {
+      const reasonVal = val || req.body?.remarks;
+      if (!reasonVal || typeof reasonVal !== 'string' || !reasonVal.trim()) {
+        throw new Error('Reason is required when reopening a complaint.');
+      }
+      if (reasonVal.trim().length < 5) {
+        throw new Error('Reopen reason must be at least 5 characters long.');
+      }
+      if (reasonVal.trim().length > 1000) {
+        throw new Error('Reopen reason cannot exceed 1000 characters.');
+      }
+      return true;
+    }),
+
+  handleValidationErrors
+];
